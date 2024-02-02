@@ -1,0 +1,125 @@
+openapi: 3.0.0
+info:
+  title: Controller API
+  description: controller API - used for platform setup
+  version: 0.0.1
+servers:
+#  - url: http://api.example.com/v1
+#    description: Optional server description, e.g. Main (production) server
+#  - url: http://staging-api.example.com
+#    description: Optional server description, e.g. Internal staging server for testing
+components:
+  schemas:
+    server:
+      properties:
+        name:
+          type: string
+        players:
+          type: integer
+        ip:
+          type: string
+        id:
+          type: string
+
+paths:
+  /servers:
+    get:
+      summary: Returns a list of current running servers.
+      description: N/A
+      responses:
+        '200': # status code
+          description: A JSON array of servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref:  '#/components/schemas/server'
+    post:
+      summary: bootstrap a new server to host players
+      description: N/A
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                players:
+                  type: integer
+                  default: 4
+                  maximum: 20
+      responses:
+        '200':
+          description: "Successfully created a new server"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server'
+  /servers/{server-id}:
+    get:
+      summary: Returns a running server with ID.
+      description: N/A
+      parameters:
+        - in: path
+          name: server-id
+          schema:
+            type: string
+          required: true
+          description: The server id
+      responses:
+        '200': # status code
+          description: A server
+          content:
+            application/json:
+              schema:
+                $ref:  '#/components/schemas/server'
+    delete:
+      summary: bootstrap a new server to host players
+      description: N/A
+      parameters:
+        - in: path
+          name: server-id
+          schema:
+            type: string
+          required: true
+          description: The server id
+      responses:
+        '200':
+          description: "Successfully deleted server"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server'
+
+    post:
+      summary: actions towards running server
+      description: N/A
+      parameters:
+        - in: path
+          name: server-id
+          schema:
+            type: string
+          required: true
+          description: The server id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum:
+                    - backup
+                    - restore
+                    - reboot
+                    - upgrade
+      responses:
+        '200':
+          description: "action completed"
