@@ -1,4 +1,7 @@
+**/api.html/
+!**/api.html/docs/
 **/.idea/
+**/.DS_Store
 # Logs
 logs
 *.log

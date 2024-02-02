@@ -3,7 +3,7 @@ info:
   title: Controller API
   description: controller API - used for platform setup
   version: 0.0.1
-servers:
+#servers:
 #  - url: http://api.example.com/v1
 #    description: Optional server description, e.g. Main (production) server
 #  - url: http://staging-api.example.com
