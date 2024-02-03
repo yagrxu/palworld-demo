@@ -1,5 +1,11 @@
+import {Construct} from "constructs";
+import {aws_ec2, aws_ssm} from "aws-cdk-lib";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as cdk from "aws-cdk-lib";
+import {PrivateProps} from "./code-stack";
+
 export class BootstrapContent {
-    bootstrapCommand = [
+    static bootstrapCommand = [
         'echo "bootstrap started"',
         // Create directories
         'mkdir /opt/steam',
@@ -60,4 +66,39 @@ export class BootstrapContent {
         'systemctl start palworld'
 
     ]
+
+    static resolveKeyPair(scope: Construct, region: string, props: PrivateProps){
+        const toCreate: string = props.createBucket;
+        if(toCreate === 'true') {
+            return new aws_ec2.KeyPair(scope, "pal-server-keypair", {
+                keyPairName: `pal-server-keypair-${region}`,
+            })
+        }else{
+            return aws_ec2.KeyPair.fromKeyPairName(scope, "pal-server-keypair", `pal-server-keypair-${region}`)
+        }
+    }
+
+    static resolveS3Bucket(scope: Construct, region: string, accountId: string, props: PrivateProps){
+        const toCreate: string = props.createKeyPair;
+        const bucketName: string = props.bucketName || `palworld-cdk-demo-${accountId}-${region}`;
+        if(toCreate === 'true') {
+            return new s3.Bucket(scope, `palworld-cdk-demo-${accountId}`, {
+                // default is already blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+                removalPolicy: cdk.RemovalPolicy.DESTROY,
+                autoDeleteObjects: true,
+                bucketName: bucketName,
+            });
+        }
+        else{
+            return s3.Bucket.fromBucketArn(scope, `palworld-cdk-demo-${accountId}`,`arn:aws:s3:::${bucketName}`);
+        }
+    }
+
+    static resolvePrivateProps(){
+        let createKeyPair= process.env.CREATE_KEYPAIR || 'false';
+        let createBucket= process.env.CREATE_BUCKET || 'false';
+        let bucketName= process.env.BUCKET_NAME;
+        let serverName= process.env.SERVER_NAME || 'palworld-game-server';
+        return {createKeyPair, createBucket, bucketName, serverName}
+    }
 }

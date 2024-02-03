@@ -1,22 +1,17 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as bootstrap from './bootstrap'
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import {aws_ec2} from "aws-cdk-lib";
+import {BootstrapContent} from "./bootstrap";
 
 export class CodeStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, privateProps : PrivateProps, props?: cdk.StackProps) {
     super(scope, id, props);
     // get account ID
     const accountId = cdk.Stack.of(this).account;
+
     // create S3 bucket
-    const bucket = new s3.Bucket(this, `palworld-cdk-demo-${accountId}`, {
-      // default is already blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-      bucketName: `palworld-cdk-demo-${accountId}`,
-    });
-    const bootstrapContent = new bootstrap.BootstrapContent();
+    const bucket = BootstrapContent.resolveS3Bucket(this, this.region, accountId, privateProps);
+
     // create a vpc
     const vpc = new cdk.aws_ec2.Vpc(this, 'Vpc', {
       //ipAddresses: this
@@ -38,7 +33,7 @@ export class CodeStack extends cdk.Stack {
         }
       ],
 
-      vpcName: `palworld-cdk-demo-${accountId}`,
+      vpcName: `palworld-cdk-demo-${this.region}`,
     });
 
     // create a security group
@@ -53,26 +48,36 @@ export class CodeStack extends cdk.Stack {
     sg.addIngressRule(cdk.aws_ec2.Peer.anyIpv4(), cdk.aws_ec2.Port.tcp(8211), 'Allow 8211 tcp Access');
     sg.addIngressRule(cdk.aws_ec2.Peer.anyIpv4(), cdk.aws_ec2.Port.udp(8211), 'Allow 8211 udp Access');
 
+    // create an EIP
+    const eip = new cdk.aws_ec2.CfnEIP(this, 'server-eip');
+
     //setup an ec2 instance in the vpc with default security group, using Ubuntu 20
     const instance = new cdk.aws_ec2.Instance(this, 'Instance', {
       vpc,
+      instanceName: privateProps.serverName,
       ssmSessionPermissions: true,
       securityGroup: sg,
-      instanceType: cdk.aws_ec2.InstanceType.of(cdk.aws_ec2.InstanceClass.T3, cdk.aws_ec2.InstanceSize.XLARGE),
+      instanceType: cdk.aws_ec2.InstanceType.of(cdk.aws_ec2.InstanceClass.M6I, cdk.aws_ec2.InstanceSize.XLARGE),
       machineImage: cdk.aws_ec2.MachineImage.lookup({
         name: 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126'
-      })
+      }),
         /*genericLinux({
         'eu-central-1': 'ami-034ba8c038f8382f9',
         'us-east-1': 'ami-029bdee89471523f0',
         'ap-southeast-1': 'ami-0ccc5852bd53507bb',
-      })*/,
-      keyName: 'yagr-demo-sg',
+      })*/
+      keyPair: BootstrapContent.resolveKeyPair(this, this.region, privateProps),
       vpcSubnets: { subnetType: cdk.aws_ec2.SubnetType.PUBLIC },
     });
     // instance.role.addManagedPolicy({
     //   managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore',
     // });
+
+    new aws_ec2.CfnEIPAssociation(this, 'server-eip-association', {
+      allocationId: eip.attrAllocationId,
+      instanceId: instance.instanceId
+    })
+
     const ssmDoc = new cdk.aws_ssm.CfnDocument(this, 'MySSMDocument', {
       name: 'MySSMDocument',
       documentType: 'Command',
@@ -84,7 +89,7 @@ export class CodeStack extends cdk.Stack {
             action: 'aws:runShellScript',
             name: 'runShellScript',
             inputs: {
-              runCommand: bootstrapContent.bootstrapCommand,
+              runCommand: BootstrapContent.bootstrapCommand,
             },
           },
         ],
@@ -104,4 +109,10 @@ export class CodeStack extends cdk.Stack {
     });
 
   }
+}
+export interface PrivateProps {
+  readonly createKeyPair: string;
+  readonly createBucket: string;
+  readonly bucketName: string | undefined;
+  readonly serverName: string | undefined;
 }
