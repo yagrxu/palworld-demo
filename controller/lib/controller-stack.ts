@@ -37,7 +37,7 @@ export class ControllerStack extends cdk.Stack {
       sortKey: {name: 'server-name', type: AttributeType.STRING},
     });
     const sessionTable = new dynamodb.Table(this, 'ServerTable', {
-      tableName: 'server-table',
+      tableName: 'server-session',
       pointInTimeRecovery: true,
       partitionKey: {name: 'server-id', type: AttributeType.STRING},
       sortKey: {name: 'server-name', type: AttributeType.STRING},

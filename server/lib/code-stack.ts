@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as bootstrap from './bootstrap'
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 export class CodeStack extends cdk.Stack {
@@ -15,9 +16,10 @@ export class CodeStack extends cdk.Stack {
       autoDeleteObjects: true,
       bucketName: `palworld-cdk-demo-${accountId}`,
     });
-
+    const bootstrapContent = new bootstrap.BootstrapContent();
     // create a vpc
     const vpc = new cdk.aws_ec2.Vpc(this, 'Vpc', {
+      //ipAddresses: this
       cidr: '10.0.0.0/16',
       maxAzs: 3,
       natGateways: 1,
@@ -57,11 +59,14 @@ export class CodeStack extends cdk.Stack {
       ssmSessionPermissions: true,
       securityGroup: sg,
       instanceType: cdk.aws_ec2.InstanceType.of(cdk.aws_ec2.InstanceClass.T3, cdk.aws_ec2.InstanceSize.XLARGE),
-      machineImage: cdk.aws_ec2.MachineImage.genericLinux({
+      machineImage: cdk.aws_ec2.MachineImage.lookup({
+        name: 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126'
+      })
+        /*genericLinux({
         'eu-central-1': 'ami-034ba8c038f8382f9',
         'us-east-1': 'ami-029bdee89471523f0',
         'ap-southeast-1': 'ami-0ccc5852bd53507bb',
-      }),
+      })*/,
       keyName: 'yagr-demo-sg',
       vpcSubnets: { subnetType: cdk.aws_ec2.SubnetType.PUBLIC },
     });
@@ -79,7 +84,7 @@ export class CodeStack extends cdk.Stack {
             action: 'aws:runShellScript',
             name: 'runShellScript',
             inputs: {
-              runCommand: ['echo "Hello from SSM!"'],
+              runCommand: bootstrapContent.bootstrapCommand,
             },
           },
         ],
