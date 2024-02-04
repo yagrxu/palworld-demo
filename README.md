@@ -22,9 +22,11 @@ export CDK_DEFAULT_REGION='ap-southeast-1'
 
    - For the fist time deployment, you can create a bucket for backups and other purposes by using `export CREATE_BUCKET=true`.
    - We use bucket name `palworld-cdk-demo-${accountId}-${region}` for all servers in the same region.
-   - In case bucket name is already taken by others, you can also provide 
+   - In case bucket name is already taken by others, you can also provide via `export BUCKET_NAME=xxx`
 
    > **&#9432;** If you do not have the bucket in the deployment region and do not set `export CREATE_BUCKET=true` nor `export BUCKET_NAME=xxx` to create or assign the bucket, the deployment will fail.
+
+3. Player Number is supported
 
 ```shell
 cd ./server
