@@ -499,7 +499,7 @@ Resources:
       IamInstanceProfile:
         Ref: InstanceInstanceProfileAB5AEF02
       ImageId: !Ref UbuntuAmi
-      InstanceType: m6i.xlarge
+      InstanceType: !Ref ServerSize
       KeyName:
         Ref: palserverkeypairBE8C875E
       SecurityGroupIds:
@@ -694,6 +694,17 @@ Parameters:
     Type: String
     Default: 'palworld-game-server'
     Description: default is 'palworld-game-server', use this to set your own server name
+  ServerSize:
+    Type: String
+    Default: t3.xlarge
+    Description: t3.large is recommended for up to 3 players. t3.xlarge is recommended for 4-8 players, t3.2xlarge is recommended for up to 20 players. Other options are for premium setup.
+    AllowedValues:
+      - t3.xlarge
+      - t3.large
+      - t3.2xlarge
+      - r6i.large
+      - r6i.xlarge
+      - r6i.2xlarge
 Conditions:
   createBucket: !Equals [!Ref CreateBucket, 'true']
   createKeyPair: !Equals [!Ref CreateKeyPair, 'true']
