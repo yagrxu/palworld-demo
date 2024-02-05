@@ -2,6 +2,9 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import {aws_ec2} from "aws-cdk-lib";
 import {BootstrapContent} from "./bootstrap";
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import {Rule, Schedule} from "aws-cdk-lib/aws-events";
+import {LambdaFunction} from "aws-cdk-lib/aws-events-targets";
 
 export class CodeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, privateProps : PrivateProps, props?: cdk.StackProps) {
@@ -61,25 +64,20 @@ export class CodeStack extends cdk.Stack {
       machineImage: cdk.aws_ec2.MachineImage.lookup({
         name: 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126'
       }),
-        /*genericLinux({
-        'eu-central-1': 'ami-034ba8c038f8382f9',
-        'us-east-1': 'ami-029bdee89471523f0',
-        'ap-southeast-1': 'ami-0ccc5852bd53507bb',
-      })*/
       keyPair: BootstrapContent.resolveKeyPair(this, this.region, privateProps),
       vpcSubnets: { subnetType: cdk.aws_ec2.SubnetType.PUBLIC },
     });
-    // instance.role.addManagedPolicy({
-    //   managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore',
-    // });
+    instance.role.addManagedPolicy({
+       managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonS3FullAccess',
+    });
 
     new aws_ec2.CfnEIPAssociation(this, 'server-eip-association', {
       allocationId: eip.attrAllocationId,
       instanceId: instance.instanceId
     })
-
+    BootstrapContent.bootstrapCommand[1] = BootstrapContent.bootstrapCommand[1].replace('[BUCKET_NAME]', bucket.bucketName)
     const ssmDoc = new cdk.aws_ssm.CfnDocument(this, 'MySSMDocument', {
-      name: 'MySSMDocument',
+      name: 'bootstrap-document',
       documentType: 'Command',
       content: {
         schemaVersion: '2.2',
@@ -96,18 +94,101 @@ export class CodeStack extends cdk.Stack {
       },
     });
     // Create SSM association to run the document on the instance
-    new cdk.aws_ssm.CfnAssociation(this, 'MySSMAssociation', {
-      name: ssmDoc.name!,
+    const bootstrap = new cdk.aws_ssm.CfnAssociation(this, 'MySSMAssociation', {
+      name: 'bootstrap-document',
       targets: [
         {
           key: 'InstanceIds',
           values: [instance.instanceId]
         }
       ],
-      associationName: 'MySSMAssociation',
-      // scheduleExpression: 'rate(5 minutes)', // adjust as needed
+      associationName: 'bootstrap-association',
     });
 
+    const backupDoc = new cdk.aws_ssm.CfnDocument(this, 'BackupDocument', {
+      name: 'backup-document',
+      documentType: 'Command',
+      content: {
+        schemaVersion: '2.2',
+        description: 'Backup Document',
+        mainSteps: [
+          {
+            action: 'aws:runShellScript',
+            name: 'runShellScript',
+            inputs: {
+              runCommand: [
+                  'cd /palworld-server/Pal/Saved/SaveGames',
+                  'current_time=$(date +%s)',
+                  'rounded_time=$((current_time / 1800 * 1800))',
+                  'formatted_time=$(date -d "@$rounded_time" "+%Y-%m-%d %H:%M:%S %Z" -u)',
+
+                  'sudo zip -r ${rounded_time}.zip ./',
+                  `s3path=s3://${bucket.bucketName}/${instance.instanceId}/`,
+                  'aws s3 cp ./${rounded_time}.zip ${s3path}/${rounded_time}.zip'
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const backupScheduler = new lambda.Function(this, 'controller-main', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      code: lambda.Code.fromAsset('resources'),
+      handler: 'backup-scheduler.main',
+      environment: {}
+    });
+    //   #!/bin/bash
+    // # Convert timestamp to human-readable format in +8 timezone
+    //   formatted_time=$(date -d "@$rounded_time" "+%Y-%m-%d %H:%M:%S %Z" -u)
+    //   echo "Human-readable time in +8 timezone: $formatted_time"
+
+    new Rule(this, 'Rule', {
+      description: "Schedule a Lambda that creates a report every 1st of the month",
+      schedule: Schedule.cron({
+        year: "*",
+        month: "*",
+        day: "*",
+        hour: "*",
+        minute: "*/30",
+      }),
+      targets: [new LambdaFunction(backupScheduler)],
+    });
+    // const backup = new cdk.aws_ssm.CfnDocument(this, 'Automation', {
+    //   name: `backup-document`,
+    //   documentType: 'Automation',
+    //   content: {
+    //     schemaVersion: '0.3',
+    //     description: 'Simple SSM Document',
+    //     mainSteps: [
+    //       {
+    //         action: 'aws:runCommand',
+    //         isEnd: true,
+    //         name: 'backup',
+    //         inputs: {
+    //           DocumentName: 'AWS-RunShellScript',
+    //           Parameters:{
+    //             commands: [
+    //               'sudo echo "hello world!" > /usr/demo.log'
+    //             ]
+    //           },
+    //           InstanceIds: [
+    //               instance.instanceId
+    //           ]
+    //         },
+    //       },
+    //     ],
+    //   },
+    // });
+  //   new cdk.aws_ssm.CfnAssociation(this, 'backup-association', {
+  //     name: 'backup-document',
+  //     targets: [
+  //       {
+  //         key: 'InstanceIds',
+  //         values: [instance.instanceId]
+  //       }
+  //     ],
+  //     associationName: 'backup-association',
+  //   });
   }
 }
 export interface PrivateProps {

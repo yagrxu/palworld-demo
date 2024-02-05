@@ -7,14 +7,22 @@ import {PrivateProps} from "./code-stack";
 export class BootstrapContent {
     static bootstrapCommand = [
         'echo "bootstrap started"',
+        'bucketName=[BUCKET_NAME]',
         // Create directories
         'mkdir /opt/steam',
         'mkdir /palworld-server',
+
+        //init s3 folder
+
+        'instanceId=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`',
+
+        'aws s3api put-object --bucket bucket-name --key ${instanceId}/ --content-length 0',
 
         // Install software
         'echo "[INFO] INSTALLING SOFTWARE"',
         'sudo apt-get update',
         'sudo apt-get install -y curl lib32gcc1 lsof git awscli',
+        'sudo apt install zip -y',
 
         // Install steam cmd
         'echo "[INFO] DOWNLOADING AND INSTALLING STEAM CMD"',
@@ -68,7 +76,7 @@ export class BootstrapContent {
     ]
 
     static resolveKeyPair(scope: Construct, region: string, props: PrivateProps){
-        const toCreate: string = props.createBucket;
+        const toCreate: string = props.createKeyPair;
         if(toCreate === 'true') {
             return new aws_ec2.KeyPair(scope, "pal-server-keypair", {
                 keyPairName: `pal-server-keypair-${region}`,
@@ -79,7 +87,7 @@ export class BootstrapContent {
     }
 
     static resolveS3Bucket(scope: Construct, region: string, accountId: string, props: PrivateProps){
-        const toCreate: string = props.createKeyPair;
+        const toCreate: string = props.createBucket;
         const bucketName: string = props.bucketName || `palworld-cdk-demo-${accountId}-${region}`;
         if(toCreate === 'true') {
             return new s3.Bucket(scope, `palworld-cdk-demo-${accountId}`, {

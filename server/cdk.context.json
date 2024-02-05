@@ -4,5 +4,14 @@
     "ap-southeast-1b",
     "ap-southeast-1c"
   ],
-  "ami:account=613477150601:filters.image-type.0=machine:filters.name.0=ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126:filters.state.0=available:region=ap-southeast-1": "ami-0ccc5852bd53507bb"
+  "ami:account=613477150601:filters.image-type.0=machine:filters.name.0=ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126:filters.state.0=available:region=ap-southeast-1": "ami-0ccc5852bd53507bb",
+  "availability-zones:account=702559360822:region=us-east-1": [
+    "us-east-1a",
+    "us-east-1b",
+    "us-east-1c",
+    "us-east-1d",
+    "us-east-1e",
+    "us-east-1f"
+  ],
+  "ami:account=702559360822:filters.image-type.0=machine:filters.name.0=ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126:filters.state.0=available:region=us-east-1": "ami-029bdee89471523f0"
 }
