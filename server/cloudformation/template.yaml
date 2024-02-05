@@ -500,8 +500,11 @@ Resources:
         Ref: InstanceInstanceProfileAB5AEF02
       ImageId: !Ref UbuntuAmi
       InstanceType: !Ref ServerSize
-      KeyName:
-        Ref: palserverkeypairBE8C875E
+      KeyName: !Join
+        - ''
+        - - 'pal-server-keypair'
+          - '-'
+          - !Ref AWS::Region
       SecurityGroupIds:
         - Fn::GetAtt:
             - SecurityGroupDD263621
@@ -601,7 +604,10 @@ Resources:
                 - echo "[INFO] STARTING PALWORLD.SERVICE"
                 - systemctl start palworld
       DocumentType: Command
-      Name: MySSMDocument
+      Name: !Join
+        - ''
+        - - MySSMDocument
+          - !Ref InstanceC1063A87
     Metadata:
       aws:cdk:path: CodeStack/MySSMDocument
   MySSMAssociation:
