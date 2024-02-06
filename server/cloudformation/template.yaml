@@ -35,10 +35,7 @@ Resources:
   VpcpublicSubnet1Subnet2BB74ED7:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'a'
+      AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: 10.0.0.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -112,10 +109,7 @@ Resources:
   VpcpublicSubnet2SubnetE34B022A:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'b'
+      AvailabilityZone: !Select [1, !GetAZs '']
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -163,10 +157,7 @@ Resources:
   VpcpublicSubnet3SubnetDFEF064A:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'c'
+      AvailabilityZone: !Select [2, !GetAZs '']
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -529,8 +520,9 @@ Resources:
         Ref: InstanceC1063A87
     Metadata:
       aws:cdk:path: CodeStack/server-eip-association
-  MySSMDocument:
+  BootstrapDocument:
     Type: AWS::SSM::Document
+    # Condition: ShouldCreate
     Properties:
       Content:
         schemaVersion: '2.2'
@@ -604,17 +596,12 @@ Resources:
                 - echo "[INFO] STARTING PALWORLD.SERVICE"
                 - systemctl start palworld
       DocumentType: Command
-      Name: !Join
-        - ''
-        - - MySSMDocument
-          - !Ref InstanceC1063A87
-    Metadata:
-      aws:cdk:path: CodeStack/MySSMDocument
+      Name: dedicated-server-bootstrap-document-v0.1
   MySSMAssociation:
     Type: AWS::SSM::Association
     Properties:
-      AssociationName: MySSMAssociation
-      Name: MySSMDocument
+      AssociationName: BootstrapAssociation
+      Name: dedicated-server-bootstrap-document-v0.1
       Targets:
         - Key: InstanceIds
           Values:
@@ -686,8 +673,8 @@ Resources:
 Parameters:
   BucketName:
     Type: String
-    Default: 'palworld-cdk-demo'
-    Description: default value will be transformed to 'palworld-cdk-demo-<account-id>-<region>', use this to set your own bucket name
+    Default: 'game-server-cdk-demo'
+    Description: default value will be transformed to 'game-server-cdk-demo-<account-id>-<region>', use this to set your own bucket name
   CreateBucket:
     Type: String
     Default: 'false'
@@ -698,8 +685,8 @@ Parameters:
     Description: default is 'false', use 'true' if you want to create key pair
   ServerName:
     Type: String
-    Default: 'palworld-game-server'
-    Description: default is 'palworld-game-server', use this to set your own server name
+    Default: 'dedicated-game-server'
+    Description: default is 'dedicated-game-server', use this to set your own server name
   ServerSize:
     Type: String
     Default: t3.xlarge
