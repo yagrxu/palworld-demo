@@ -205,10 +205,7 @@ Resources:
   VpcprivateSubnet1SubnetCEAD3716:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'a'
+      AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: 10.0.3.0/24
       MapPublicIpOnLaunch: false
       Tags:
@@ -254,10 +251,7 @@ Resources:
   VpcprivateSubnet2Subnet2DE7549C:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'b'
+      AvailabilityZone: !Select [1, !GetAZs '']
       CidrBlock: 10.0.4.0/24
       MapPublicIpOnLaunch: false
       Tags:
@@ -303,10 +297,7 @@ Resources:
   VpcprivateSubnet3SubnetA5AC68D9:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'c'
+      AvailabilityZone: !Select [2, !GetAZs '']
       CidrBlock: 10.0.5.0/24
       MapPublicIpOnLaunch: false
       Tags:
@@ -483,10 +474,7 @@ Resources:
   InstanceC1063A87:
     Type: AWS::EC2::Instance
     Properties:
-      AvailabilityZone: !Join
-        - ''
-        - - !Ref AWS::Region
-          - 'a'
+      AvailabilityZone: !Select [0, !GetAZs '']
       IamInstanceProfile:
         Ref: InstanceInstanceProfileAB5AEF02
       ImageId: !Ref UbuntuAmi
