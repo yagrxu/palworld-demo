@@ -1,6 +1,6 @@
 ---
 Resources:
-  palworldcdkdemo61347715060138F4C040:
+  GameBackupBucket:
     Condition: createBucket
     Type: AWS::S3::Bucket
     Properties:
@@ -16,7 +16,7 @@ Resources:
           Value: 'true'
     UpdateReplacePolicy: Delete
     DeletionPolicy: Retain
-  Vpc8378EB38:
+  GameServerVPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
@@ -30,9 +30,7 @@ Resources:
             - - 'palworld-cdk-demo'
               - '-'
               - !Ref AWS::Region
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/Resource
-  VpcpublicSubnet1Subnet2BB74ED7:
+  PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']
@@ -46,67 +44,55 @@ Resources:
         - Key: Name
           Value: CodeStack/Vpc/publicSubnet1
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet1/Subnet
-  VpcpublicSubnet1RouteTable15C15F8E:
+        Ref: GameServerVPC
+  PublicSubnetRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
           Value: CodeStack/Vpc/publicSubnet1
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet1/RouteTable
-  VpcpublicSubnet1RouteTableAssociation4E83B6E4:
+        Ref: GameServerVPC
+  PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: VpcpublicSubnet1RouteTable15C15F8E
+        Ref: PublicSubnetRouteTable
       SubnetId:
-        Ref: VpcpublicSubnet1Subnet2BB74ED7
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet1/RouteTableAssociation
-  VpcpublicSubnet1DefaultRouteB88F9E93:
+        Ref: PublicSubnet1
+  PublicSubnetDefaultRoute:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
-        Ref: VpcIGWD7BA715C
+        Ref: VPCIGW
       RouteTableId:
-        Ref: VpcpublicSubnet1RouteTable15C15F8E
+        Ref: PublicSubnetRouteTable
     DependsOn:
-      - VpcVPCGWBF912B6E
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet1/DefaultRoute
-  VpcpublicSubnet1EIP411541E6:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-      Tags:
-        - Key: Name
-          Value: CodeStack/Vpc/publicSubnet1
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet1/EIP
-  VpcpublicSubnet1NATGatewayA036E8A6:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId:
-        Fn::GetAtt:
-          - VpcpublicSubnet1EIP411541E6
-          - AllocationId
-      SubnetId:
-        Ref: VpcpublicSubnet1Subnet2BB74ED7
-      Tags:
-        - Key: Name
-          Value: CodeStack/Vpc/publicSubnet1
-    DependsOn:
-      - VpcpublicSubnet1DefaultRouteB88F9E93
-      - VpcpublicSubnet1RouteTableAssociation4E83B6E4
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet1/NATGateway
-  VpcpublicSubnet2SubnetE34B022A:
+      - VPCGWATT
+#  PublicSubnetEIP:
+#    Type: AWS::EC2::EIP
+#    Properties:
+#      Domain: vpc
+#      Tags:
+#        - Key: Name
+#          Value: CodeStack/Vpc/publicSubnet1
+#  PublicSubnetNATGateway:
+#    Type: AWS::EC2::NatGateway
+#    Properties:
+#      AllocationId:
+#        Fn::GetAtt:
+#          - PublicSubnetEIP
+#          - AllocationId
+#      SubnetId:
+#        Ref: PublicSubnet1
+#      Tags:
+#        - Key: Name
+#          Value: CodeStack/Vpc/publicSubnet1
+#    DependsOn:
+#      - PublicSubnetDefaultRoute
+#      - PublicSubnetRouteTableAssociation
+  PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [1, !GetAZs '']
@@ -118,43 +104,35 @@ Resources:
         - Key: aws-cdk:subnet-type
           Value: Public
         - Key: Name
-          Value: CodeStack/Vpc/publicSubnet2
+          Value: CodeStack/Vpc/PublicSubnet2
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet2/Subnet
-  VpcpublicSubnet2RouteTableC5A6DF77:
+        Ref: GameServerVPC
+  PublicSubnet2RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
           Value: CodeStack/Vpc/publicSubnet2
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet2/RouteTable
-  VpcpublicSubnet2RouteTableAssociationCCE257FF:
+        Ref: GameServerVPC
+  PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: VpcpublicSubnet2RouteTableC5A6DF77
+        Ref: PublicSubnet2RouteTable
       SubnetId:
-        Ref: VpcpublicSubnet2SubnetE34B022A
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet2/RouteTableAssociation
-  VpcpublicSubnet2DefaultRoute732F0BEB:
+        Ref: PublicSubnet2
+  PublicSubnet2DefaultRoute:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
-        Ref: VpcIGWD7BA715C
+        Ref: VPCIGW
       RouteTableId:
-        Ref: VpcpublicSubnet2RouteTableC5A6DF77
+        Ref: PublicSubnet2RouteTable
     DependsOn:
-      - VpcVPCGWBF912B6E
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet2/DefaultRoute
-  VpcpublicSubnet3SubnetDFEF064A:
+      - VPCGWATT
+  PublicSubnet3:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [2, !GetAZs '']
@@ -168,41 +146,33 @@ Resources:
         - Key: Name
           Value: CodeStack/Vpc/publicSubnet3
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet3/Subnet
-  VpcpublicSubnet3RouteTable80517A9C:
+        Ref: GameServerVPC
+  PublicSubnet3RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
           Value: CodeStack/Vpc/publicSubnet3
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet3/RouteTable
-  VpcpublicSubnet3RouteTableAssociation61C43F88:
+        Ref: GameServerVPC
+  PublicSubnet3RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: VpcpublicSubnet3RouteTable80517A9C
+        Ref: PublicSubnet3RouteTable
       SubnetId:
-        Ref: VpcpublicSubnet3SubnetDFEF064A
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet3/RouteTableAssociation
-  VpcpublicSubnet3DefaultRouteA3904BF0:
+        Ref: PublicSubnet3
+  PublicSubnet3DefaultRoute:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
-        Ref: VpcIGWD7BA715C
+        Ref: VPCIGW
       RouteTableId:
-        Ref: VpcpublicSubnet3RouteTable80517A9C
+        Ref: PublicSubnet3RouteTable
     DependsOn:
-      - VpcVPCGWBF912B6E
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/publicSubnet3/DefaultRoute
-  VpcprivateSubnet1SubnetCEAD3716:
+      - VPCGWATT
+  PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']
@@ -216,39 +186,31 @@ Resources:
         - Key: Name
           Value: CodeStack/Vpc/privateSubnet1
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet1/Subnet
-  VpcprivateSubnet1RouteTable1979EACB:
+        Ref: GameServerVPC
+  PrivateSubnet1RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
           Value: CodeStack/Vpc/privateSubnet1
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet1/RouteTable
-  VpcprivateSubnet1RouteTableAssociationEEBD93CE:
+        Ref: GameServerVPC
+  PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: VpcprivateSubnet1RouteTable1979EACB
+        Ref: PrivateSubnet1RouteTable
       SubnetId:
-        Ref: VpcprivateSubnet1SubnetCEAD3716
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet1/RouteTableAssociation
-  VpcprivateSubnet1DefaultRouteB506891A:
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId:
-        Ref: VpcpublicSubnet1NATGatewayA036E8A6
-      RouteTableId:
-        Ref: VpcprivateSubnet1RouteTable1979EACB
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet1/DefaultRoute
-  VpcprivateSubnet2Subnet2DE7549C:
+        Ref: PrivateSubnet1
+#  PrivateSubnet1DefaultRoute:
+#    Type: AWS::EC2::Route
+#    Properties:
+#      DestinationCidrBlock: 0.0.0.0/0
+#      NatGatewayId:
+#        Ref: PublicSubnetNATGateway
+#      RouteTableId:
+#        Ref: PrivateSubnet1RouteTable
+  PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [1, !GetAZs '']
@@ -262,39 +224,31 @@ Resources:
         - Key: Name
           Value: CodeStack/Vpc/privateSubnet2
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet2/Subnet
-  VpcprivateSubnet2RouteTable4D0FFC8C:
+        Ref: GameServerVPC
+  PrivateSubnet2RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
           Value: CodeStack/Vpc/privateSubnet2
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet2/RouteTable
-  VpcprivateSubnet2RouteTableAssociationB691E645:
+        Ref: GameServerVPC
+  PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: VpcprivateSubnet2RouteTable4D0FFC8C
+        Ref: PrivateSubnet2RouteTable
       SubnetId:
-        Ref: VpcprivateSubnet2Subnet2DE7549C
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet2/RouteTableAssociation
-  VpcprivateSubnet2DefaultRouteBAC3C1C3:
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId:
-        Ref: VpcpublicSubnet1NATGatewayA036E8A6
-      RouteTableId:
-        Ref: VpcprivateSubnet2RouteTable4D0FFC8C
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet2/DefaultRoute
-  VpcprivateSubnet3SubnetA5AC68D9:
+        Ref: PrivateSubnet2
+#  PrivateSubnet2DefaultRoute:
+#    Type: AWS::EC2::Route
+#    Properties:
+#      DestinationCidrBlock: 0.0.0.0/0
+#      NatGatewayId:
+#        Ref: PublicSubnetNATGateway
+#      RouteTableId:
+#        Ref: PrivateSubnet2RouteTable
+  PrivateSubnet3:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [2, !GetAZs '']
@@ -308,39 +262,31 @@ Resources:
         - Key: Name
           Value: CodeStack/Vpc/privateSubnet3
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet3/Subnet
-  VpcprivateSubnet3RouteTableAF0D9985:
+        Ref: GameServerVPC
+  PrivateSubnet3RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
           Value: CodeStack/Vpc/privateSubnet3
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet3/RouteTable
-  VpcprivateSubnet3RouteTableAssociation88A12983:
+        Ref: GameServerVPC
+  PrivateSubnet3RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: VpcprivateSubnet3RouteTableAF0D9985
+        Ref: PrivateSubnet3RouteTable
       SubnetId:
-        Ref: VpcprivateSubnet3SubnetA5AC68D9
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet3/RouteTableAssociation
-  VpcprivateSubnet3DefaultRoute5028F7A1:
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId:
-        Ref: VpcpublicSubnet1NATGatewayA036E8A6
-      RouteTableId:
-        Ref: VpcprivateSubnet3RouteTableAF0D9985
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/privateSubnet3/DefaultRoute
-  VpcIGWD7BA715C:
+        Ref: PrivateSubnet3
+#  PrivateSubnet3DefaultRoute:
+#    Type: AWS::EC2::Route
+#    Properties:
+#      DestinationCidrBlock: 0.0.0.0/0
+#      NatGatewayId:
+#        Ref: PublicSubnetNATGateway
+#      RouteTableId:
+#        Ref: PrivateSubnet3RouteTable
+  VPCIGW:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
@@ -350,18 +296,14 @@ Resources:
             - - 'palworld-cdk-demo'
               - '-'
               - !Ref AWS::Region
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/IGW
-  VpcVPCGWBF912B6E:
+  VPCGWATT:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       InternetGatewayId:
-        Ref: VpcIGWD7BA715C
+        Ref: VPCIGW
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/Vpc/VPCGW
-  CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0:
+        Ref: GameServerVPC
+  CustomVpcRestrictDefaultSGCustomResourceProviderRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -393,11 +335,9 @@ Resources:
                         - 613477150601
                         - !Ref AWS::AccountId
                         - Fn::GetAtt:
-                            - Vpc8378EB38
+                            - GameServerVPC
                             - DefaultSecurityGroup
-    Metadata:
-      aws:cdk:path: CodeStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role
-  SecurityGroupDD263621:
+  SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow SSH (TCP port 22) in
@@ -423,14 +363,10 @@ Resources:
           IpProtocol: udp
           ToPort: 8211
       VpcId:
-        Ref: Vpc8378EB38
-    Metadata:
-      aws:cdk:path: CodeStack/SecurityGroup/Resource
-  servereip:
+        Ref: GameServerVPC
+  GameServerEIP:
     Type: AWS::EC2::EIP
-    Metadata:
-      aws:cdk:path: CodeStack/server-eip
-  palserverkeypairBE8C875E:
+  GameServerKeyPair:
     Condition: createKeyPair
     Type: AWS::EC2::KeyPair
     Properties:
@@ -441,9 +377,8 @@ Resources:
           - '-'
           - !Ref AWS::Region
       KeyType: rsa
-    Metadata:
-      aws:cdk:path: CodeStack/pal-server-keypair/Resource
-  InstanceInstanceRoleE9785DE5:
+    DeletionPolicy: Retain
+  InstanceRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -459,24 +394,25 @@ Resources:
             - - 'arn:'
               - Ref: AWS::Partition
               - ':iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - ':iam::aws:policy/AmazonS3FullAccess'
       Tags:
         - Key: Name
           Value: palworld-game-server
-    Metadata:
-      aws:cdk:path: CodeStack/Instance/InstanceRole/Resource
-  InstanceInstanceProfileAB5AEF02:
+  InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
-        - Ref: InstanceInstanceRoleE9785DE5
-    Metadata:
-      aws:cdk:path: CodeStack/Instance/InstanceProfile
-  InstanceC1063A87:
+        - Ref: InstanceRole
+  GameServerInstance:
     Type: AWS::EC2::Instance
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']
       IamInstanceProfile:
-        Ref: InstanceInstanceProfileAB5AEF02
+        Ref: InstanceProfile
       ImageId: !Ref UbuntuAmi
       InstanceType: !Ref ServerSize
       KeyName: !Join
@@ -486,28 +422,26 @@ Resources:
           - !Ref AWS::Region
       SecurityGroupIds:
         - Fn::GetAtt:
-            - SecurityGroupDD263621
+            - SecurityGroup
             - GroupId
       SubnetId:
-        Ref: VpcpublicSubnet1Subnet2BB74ED7
+        Ref: PublicSubnet1
       Tags:
         - Key: Name
           Value: !Ref ServerName
       UserData:
         Fn::Base64: '#!/bin/bash'
     DependsOn:
-      - InstanceInstanceRoleE9785DE5
-  servereipassociation:
+      - InstanceRole
+  GameServerEIPAssociation:
     Type: AWS::EC2::EIPAssociation
     Properties:
       AllocationId:
         Fn::GetAtt:
-          - servereip
+          - GameServerEIP
           - AllocationId
       InstanceId:
-        Ref: InstanceC1063A87
-    Metadata:
-      aws:cdk:path: CodeStack/server-eip-association
+        Ref: GameServerInstance
   BootstrapDocument:
     Type: AWS::SSM::Document
     Properties:
@@ -520,21 +454,41 @@ Resources:
             inputs:
               runCommand:
                 - echo "bootstrap started"
+                - Fn::Join:
+                    - ''
+                    - - 'bucketName='
+                      - Ref: BucketName
+                      - '-'
+                      - Ref: AWS::AccountId
+                      - '-'
+                      - Ref: AWS::Region
                 - mkdir /opt/steam
                 - mkdir /palworld-server
+
                 - echo "[INFO] INSTALLING SOFTWARE"
                 - sudo apt-get update
                 - sudo apt-get install -y curl lib32gcc1 lsof git awscli
+                - sudo apt install zip -y
+                - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                - unzip awscliv2.zip
+                - sudo ./aws/install
+
+                - echo "[INFO] INIT S3 DIRECTORY FOR BACKUP"
+                - instanceId=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`
+                - aws s3api put-object --bucket ${bucketName} --key ${instanceId}/ --content-length 0
+
                 - echo "[INFO] DOWNLOADING AND INSTALLING STEAM CMD"
                 - wget -P /opt/steam https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
                 - yes "" | sudo add-apt-repository multiverse
                 - yes "" | sudo dpkg --add-architecture i386
                 - sudo apt update
-                - 'tar -xzf /opt/steam/steamcmd_linux.tar.gz -C /opt/steam '
+                - tar -xzf /opt/steam/steamcmd_linux.tar.gz -C /opt/steam
                 - chmod 755 /opt/steam/steamcmd.sh
+
                 - echo "[INFO] CREATING STEAM USER"
                 - useradd -m -U steam
                 - chown -R steam:steam /palworld-server
+
                 - echo "[INFO] SETTING UP STEAMCMD INSTALLER TO DOWNLOAD PALWORLD"
                 - sudo chown -R steam:steam /opt/steam
                 - |-
@@ -543,6 +497,7 @@ Resources:
                   login anonymous
                   app_update 2394010 validate
                   quit" > /opt/steam/download-palworld.txt
+
                 - echo "[INFO] DOWNLOADING PALWORLD"
                 - sudo -u steam /opt/steam/steamcmd.sh +runscript /opt/steam/download-palworld.txt
                 - sudo -u steam mkdir -p /home/steam/.steam/sdk64/
@@ -551,6 +506,7 @@ Resources:
                 - sleep 60
                 - sudo -u steam cp "/home/steam/Steam/steamapps/common/Steamworks SDK
                   Redist/linux64/steamclient.so" /home/steam/.steam/sdk64/
+
                 - echo "[INFO] CREATING SYSTEMD SERVICE PALWORLD"
                 - |-
                   sudo echo "[Unit]
@@ -596,15 +552,7 @@ Resources:
       Targets:
         - Key: InstanceIds
           Values:
-            - Ref: InstanceC1063A87
-    Metadata:
-      aws:cdk:path: CodeStack/MySSMAssociation
-  CDKMetadata:
-    Type: AWS::CDK::Metadata
-    Properties:
-      Analytics: v2:deflate64:H4sIAAAAAAAA/1VRwW7CMAz9lt1DBt1lV2ATQpOmqExcpzR4zNAmKHFAVdV/n0voAie/vOc8P8uFnBWFnD7pS5iY3XFSYyW7DWlzFEx9d+FFdotojkBi+WNvKBXlajRtptO7F2AK2W1PZlC2ailUrFjYxMomk4xKFwm+dFVD5jM3D8EZ1ITO/jcP4H2thvKpaaUJLroVyuOZYTZeWwLPeGxISW6vOfF6vw1YEhsw0SO1K+/i6ZrhgfiAVmn0gzDCtQ2krYE0JWMOdZe3F6gb2ZUubTbW8YPy7gdr6EUI3MXCmzPxGojxvU0vljGQa0oILvo0KeMHiT3PuAO/0AEEewDxFfdo92Ls6IV1O5CH8HyevcrZlK9+CIgTHy1hA7JM9Q9N6ZC1EgIAAA==
-    Metadata:
-      aws:cdk:path: CodeStack/CDKMetadata/Default
+            - Ref: GameServerInstance
   DescribeImagesRole:
     Type: AWS::IAM::Role
     Properties:
@@ -661,6 +609,136 @@ Resources:
     Properties:
       ServiceToken: !Sub ${GetLatestAMI.Arn}
       Name: 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126'
+  BackupFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonSSMFullAccess
+  BackupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Role: !Sub ${BackupFunctionRole.Arn}
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import { SSMClient, CreateAssociationCommand } from '@aws-sdk/client-ssm';
+          
+          export const handler = async (event, context) => {    
+            console.log(event)
+            const documentName = event.documentName;
+            const targets = [
+             { Key: 'InstanceIds', Values: [event.instanceId] },
+            ];
+            const associationParams = {
+              Targets: targets,
+              AssociationName: 'bootstrap-' + event.instanceId,
+              Name: documentName,
+            };
+            const ssmClient = new SSMClient();
+          
+            try{
+              const createAssociationCommand = new CreateAssociationCommand(associationParams);
+              const data = await ssmClient.send(createAssociationCommand);
+              console.log('Association created successfully:', data);
+          
+              // Return a response if needed
+              return {
+                statusCode: 200,
+                body: JSON.stringify({ message: 'Association created successfully' }),
+        
+              }
+        
+            } catch (error) {
+              console.error('Error creating association:', error);
+                
+              // Return an error response
+              return {
+                statusCode: 500,
+                body: JSON.stringify({ error: 'Error creating association' }),
+              };
+            } finally {
+              // Close the SDK client to release resources
+              ssmClient.destroy();
+            }
+          }
+  BackupSchedulerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Schedule a Lambda that creates backup every 30 minutes
+      ScheduleExpression: cron(*/30 * * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - BackupFunction
+              - Arn
+          Id: Target0
+          Input:
+            Fn::Join:
+              - ""
+              - - '{"instanceId":"'
+                - Ref: GameServerInstance
+                - '","documentName":"backup-document"}'
+  BackupFunctionAllowRuleTrigger:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - BackupFunction
+          - Arn
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - BackupSchedulerRule
+          - Arn
+  BackupDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: "2.2"
+        description: Backup Document
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              runCommand:
+                - cd /palworld-server/Pal/Saved/SaveGames
+                - current_time=$(date +%s)
+                - rounded_time=$((current_time / 1800 * 1800))
+                - formatted_time=$(date -d "@$rounded_time" "+%Y-%m-%d %H:%M:%S %Z" -u)
+                - sudo zip -r ${rounded_time}.zip ./
+                - Fn::Join:
+                    - ""
+                    - - s3path=s3://
+                      - Ref: BucketName
+                      - '-'
+                      - Ref: AWS::AccountId
+                      - '-'
+                      - Ref: AWS::Region
+                      - /
+                      - Ref: GameServerInstance
+                - aws s3 cp ./${rounded_time}.zip ${s3path}/${rounded_time}.zip
+      DocumentType: Command
+      Name: backup-document
 Parameters:
   BucketName:
     Type: String
@@ -669,11 +747,11 @@ Parameters:
   CreateBucket:
     Type: String
     Default: 'false'
-    Description: default is 'false', use 'true' if you want to create bucket
+    Description: default is 'false', use 'true' if you want to create bucket. Please Note! bucket deletion policy is retain. Therefore as long as it is created and not manually deleted, you do not need to create it again.
   CreateKeyPair:
     Type: String
     Default: 'false'
-    Description: default is 'false', use 'true' if you want to create key pair
+    Description: default is 'false', use 'true' if you want to create key pair. Please Note! bucket deletion policy is retain. Therefore as long as it is created and not manually deleted, you do not need to create it again.
   ServerName:
     Type: String
     Default: 'dedicated-game-server'

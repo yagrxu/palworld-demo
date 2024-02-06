@@ -24,7 +24,7 @@ export const main = async (event, context) => {    console.log(event)
 
         }
 
-    }catch (error) {
+    } catch (error) {
         console.error('Error creating association:', error);
 
         // Return an error response
