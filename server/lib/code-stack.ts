@@ -6,6 +6,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {LambdaFunction} from "aws-cdk-lib/aws-events-targets";
 import * as events from 'aws-cdk-lib/aws-events';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class CodeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, privateProps : PrivateProps, props?: cdk.StackProps) {
@@ -132,13 +133,21 @@ export class CodeStack extends cdk.Stack {
         ],
       },
     });
+
     const backupScheduler = new lambda.Function(this, 'controller-main', {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('resources'),
       handler: 'backup-scheduler.main',
       environment: {
         region: this.region
-      }
+      },
+      initialPolicy: [
+        // Define your initial IAM policy statements here
+        new iam.PolicyStatement({
+          actions: ['ssm:*'],
+          resources: ['*']
+        }),
+      ],
     });
     //   #!/bin/bash
     // # Convert timestamp to human-readable format in +8 timezone
@@ -152,48 +161,12 @@ export class CodeStack extends cdk.Stack {
         month: "*",
         day: "*",
         hour: "*",
-        minute: "*", //*/30
+        minute: "*/30",
       }),
       targets: [new LambdaFunction(backupScheduler, {
-        event: events.RuleTargetInput.fromObject({ instanceId: instance.instanceId })
+        event: events.RuleTargetInput.fromObject({ instanceId: instance.instanceId, documentName: backupDoc.name })
       })],
     });
-    // const backup = new cdk.aws_ssm.CfnDocument(this, 'Automation', {
-    //   name: `backup-document`,
-    //   documentType: 'Automation',
-    //   content: {
-    //     schemaVersion: '0.3',
-    //     description: 'Simple SSM Document',
-    //     mainSteps: [
-    //       {
-    //         action: 'aws:runCommand',
-    //         isEnd: true,
-    //         name: 'backup',
-    //         inputs: {
-    //           DocumentName: 'AWS-RunShellScript',
-    //           Parameters:{
-    //             commands: [
-    //               'sudo echo "hello world!" > /usr/demo.log'
-    //             ]
-    //           },
-    //           InstanceIds: [
-    //               instance.instanceId
-    //           ]
-    //         },
-    //       },
-    //     ],
-    //   },
-    // });
-  //   new cdk.aws_ssm.CfnAssociation(this, 'backup-association', {
-  //     name: 'backup-document',
-  //     targets: [
-  //       {
-  //         key: 'InstanceIds',
-  //         values: [instance.instanceId]
-  //       }
-  //     ],
-  //     associationName: 'backup-association',
-  //   });
   }
 }
 export interface PrivateProps {

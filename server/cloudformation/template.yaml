@@ -510,7 +510,6 @@ Resources:
       aws:cdk:path: CodeStack/server-eip-association
   BootstrapDocument:
     Type: AWS::SSM::Document
-    # Condition: ShouldCreate
     Properties:
       Content:
         schemaVersion: '2.2'
@@ -584,12 +583,16 @@ Resources:
                 - echo "[INFO] STARTING PALWORLD.SERVICE"
                 - systemctl start palworld
       DocumentType: Command
-      Name: dedicated-server-bootstrap-document-v0.1
+      Name: !Join
+        - ''
+        - - !Ref AWS::StackName
+          - -dedicated-server-bootstrap-document-v0.1
+
   MySSMAssociation:
     Type: AWS::SSM::Association
     Properties:
       AssociationName: BootstrapAssociation
-      Name: dedicated-server-bootstrap-document-v0.1
+      Name: !Ref BootstrapDocument
       Targets:
         - Key: InstanceIds
           Values:
