@@ -5,6 +5,7 @@ import {BootstrapContent} from "./bootstrap";
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {LambdaFunction} from "aws-cdk-lib/aws-events-targets";
+import * as events from 'aws-cdk-lib/aws-events';
 
 export class CodeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, privateProps : PrivateProps, props?: cdk.StackProps) {
@@ -135,7 +136,9 @@ export class CodeStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('resources'),
       handler: 'backup-scheduler.main',
-      environment: {}
+      environment: {
+        region: this.region
+      }
     });
     //   #!/bin/bash
     // # Convert timestamp to human-readable format in +8 timezone
@@ -149,9 +152,11 @@ export class CodeStack extends cdk.Stack {
         month: "*",
         day: "*",
         hour: "*",
-        minute: "*/30",
+        minute: "*", //*/30
       }),
-      targets: [new LambdaFunction(backupScheduler)],
+      targets: [new LambdaFunction(backupScheduler, {
+        event: events.RuleTargetInput.fromObject({ instanceId: instance.instanceId })
+      })],
     });
     // const backup = new cdk.aws_ssm.CfnDocument(this, 'Automation', {
     //   name: `backup-document`,

@@ -12,17 +12,20 @@ export class BootstrapContent {
         'mkdir /opt/steam',
         'mkdir /palworld-server',
 
-        //init s3 folder
-
-        'instanceId=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`',
-
-        'aws s3api put-object --bucket bucket-name --key ${instanceId}/ --content-length 0',
-
         // Install software
         'echo "[INFO] INSTALLING SOFTWARE"',
         'sudo apt-get update',
         'sudo apt-get install -y curl lib32gcc1 lsof git awscli',
         'sudo apt install zip -y',
+        'curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"',
+        'unzip awscliv2.zip',
+        'sudo ./aws/install',
+
+        //init s3 folder
+        'instanceId=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`',
+        'aws s3api put-object --bucket $bucketName --key ${instanceId}/ --content-length 0',
+
+
 
         // Install steam cmd
         'echo "[INFO] DOWNLOADING AND INSTALLING STEAM CMD"',
