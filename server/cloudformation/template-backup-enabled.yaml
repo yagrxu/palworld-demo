@@ -639,9 +639,11 @@ Resources:
       Timeout: 300
       Code:
         ZipFile: |
-          import { SSMClient, CreateAssociationCommand } from '@aws-sdk/client-ssm';
-          
-          export const handler = async (event, context) => {    
+            const ssm = require('@aws-sdk/client-ssm');
+            const SSMClient = ssm.SSMClient;
+            const CreateAssociationCommand = ssm.CreateAssociationCommand;
+            
+            exports.handler = async function (event, context) { 
             console.log(event)
             const documentName = event.documentName;
             const targets = [
