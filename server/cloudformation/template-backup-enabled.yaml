@@ -772,3 +772,17 @@ Parameters:
 Conditions:
   createBucket: !Equals [!Ref CreateBucket, 'true']
   createKeyPair: !Equals [!Ref CreateKeyPair, 'true']
+
+Outputs:
+  GameServerIP:
+    Value: !Ref GameServerEIP
+    Description: Game Server Instance EIP
+  BucketName:
+    Value: !Join
+             - ''
+             - - !Ref BucketName
+               - '-'
+               - !Ref AWS::AccountId
+               - '-'
+               - !Ref AWS::Region
+    Description: Bucket Name
