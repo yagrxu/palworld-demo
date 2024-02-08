@@ -100,7 +100,11 @@ export class BootstrapContent {
                 autoDeleteObjects: true,
                 bucketName: bucketName,
             });
-            // backupBucket.addLifecycleRule(new LifecycleRule())
+            backupBucket.addLifecycleRule({
+                enabled:true,
+                // expiredObjectDeleteMarker: true,
+                expiration: cdk.Duration.days(3)
+            })
             return backupBucket;
         }
         else{

@@ -4,6 +4,11 @@ Resources:
     Condition: createBucket
     Type: AWS::S3::Bucket
     Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status:  Enabled
+            ExpirationInDays: !Ref BackupExpiration
       BucketName: !Join
         - ''
         - - !Ref BucketName
@@ -753,15 +758,15 @@ Resources:
                       - Ref: AWS::Region
                       - /
                       - Ref: GameServerInstance
-                - aws s3 cp ./restore-backup-${current_time}.zip ${s3path}/restore-backup-${current_time}.zip
-                - aws s3 cp ${s3path}/${restore_time}.zip ./restore-file.zip
-                - sudo rm -rf ./
-                - sudo unzip ./restore-file.zip
+                - aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - sudo rm -rf /palworld-server/Pal/Saved/SaveGames/*
+                - sudo unzip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - sudo rm /palworld-server/Pal/Saved/SaveGames/restore-file.zip
       DocumentType: Command
       Name: !Join
         - ''
         - - !Ref AWS::StackName
-          - -restore-document
+          - '-restore-document'
   RestoreFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -769,6 +774,12 @@ Resources:
       Handler: index.handler
       Role: !Sub ${RestoreFunctionRole.Arn}
       Timeout: 300
+      Environment:
+        Variables:
+          DocumentName: !Join
+                      - ''
+                      - - !Ref AWS::StackName
+                        - '-restore-document'
       Code:
         ZipFile: |
           const ssm = require('@aws-sdk/client-ssm');
@@ -776,7 +787,46 @@ Resources:
           const CreateAssociationCommand = ssm.CreateAssociationCommand;
             
           exports.handler = async function (event, context) { 
-            console.log('hello world');
+            console.log(event);
+            const body = JSON.parse(event.body)
+            const documentName = process.env.DocumentName;
+            const targets = [
+              { Key: 'InstanceIds', Values: [body.instanceId] },
+            ];
+            const associationParams = {
+              Targets: targets,
+              Parameters: {
+                timestamp: [ body.timestamp ]
+              },
+              AssociationName: 'restore-' + event.instanceId,
+              Name: documentName,
+            };
+            const ssmClient = new SSMClient();
+        
+            try{
+              const createAssociationCommand = new CreateAssociationCommand(associationParams);
+              const data = await ssmClient.send(createAssociationCommand);
+              console.log('Association created successfully:', data);
+              
+              // Return a response if needed
+              return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Association created successfully' }),
+            
+              }
+          
+            } catch (error) {
+              console.error('Error creating association:', error);
+              
+              // Return an error response
+              return {
+              statusCode: 500,
+              body: JSON.stringify({ error: 'Error creating association' }),
+            };
+            } finally {
+              // Close the SDK client to release resources
+              ssmClient.destroy();
+            }
           }
     DependsOn:
       - RestoreFunctionRole
@@ -801,75 +851,75 @@ Resources:
             - - 'arn:'
               - Ref: AWS::Partition
               - :iam::aws:policy/AmazonSSMFullAccess
-#  ServerApi:
-#    Type: AWS::ApiGateway::RestApi
-#    Properties:
-#      Description: Server Operation Service
-#      Name: Server Operation Service
-#  ServerApiDeployment:
-#    Type: AWS::ApiGateway::Deployment
-#    Properties:
-#      Description: This service serves server operations.
-#      RestApiId:
-#        Ref: ServerApi
-#      StageName: prod
-#    DependsOn:
-#      - ServerApi
-#  ServerApiDeploymentStageProd:
-#    Type: AWS::ApiGateway::Stage
-#    Properties:
-#      DeploymentId:
-#        Ref: ServerApiDeployment
-#      RestApiId:
-#        Ref: ServerApi
-#      StageName: prod
-#  ServerApiAllowLambdaInvocationPermissions:
-#    Type: AWS::Lambda::Permission
-#    Properties:
-#      Action: lambda:InvokeFunction
-#      FunctionName:
-#        Fn::GetAtt:
-#          - RestoreFunction
-#          - Arn
-#      Principal: apigateway.amazonaws.com
-#      SourceArn:
-#        Fn::Join:
-#          - ''
-#          - - 'arn:aws:execute-api:'
-#            - Ref: AWS::Region
-#            - ':'
-#            - Ref: AWS::AccountId
-#            - ':'
-#            - Ref: ServerApi
-#            - '/'
-#            - Ref: ServerApiDeploymentStageProd
-#            - '/GET/'
-#  ServerApiMethod:
-#    Type: AWS::ApiGateway::Method
-#    Properties:
-#      AuthorizationType: NONE
-#      HttpMethod: GET
-#      Integration:
-#        IntegrationHttpMethod: POST
-#        RequestTemplates:
-#          application/json: '{ "statusCode": "200" }'
-#        Type: AWS_PROXY
-#        Uri:
-#          Fn::Join:
-#            - ''
-#            - - 'arn:aws:apigateway:'
-#              - Ref: AWS::Region
-#              - ':lambda:path/2015-03-31/functions/'
-#              - Fn::GetAtt:
-#                  - RestoreFunction
-#                  - Arn
-#              - '/invocations'
-#      ResourceId:
-#        Fn::GetAtt:
-#          - ServerApi
-#          - RootResourceId
-#      RestApiId:
-#        Ref: ServerApi
+  ServerApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Server Operation Service
+      Name: Server Operation Service
+  ServerApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      Description: This service serves server operations.
+      RestApiId:
+        Ref: ServerApi
+      StageName: prod
+    DependsOn:
+      - ServerApiMethod
+  ServerApiDeploymentStageProd:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ServerApiDeployment
+      RestApiId:
+        Ref: ServerApi
+      StageName: production
+  ServerApiAllowLambdaInvocationPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - RestoreFunction
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: ServerApi
+            - '/'
+            - Ref: ServerApiDeploymentStageProd
+            - '/GET/'
+  ServerApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        RequestTemplates:
+          application/json: '{ "statusCode": "200" }'
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - ':lambda:path/2015-03-31/functions/'
+              - Fn::GetAtt:
+                  - RestoreFunction
+                  - Arn
+              - '/invocations'
+      ResourceId:
+        Fn::GetAtt:
+          - ServerApi
+          - RootResourceId
+      RestApiId:
+        Ref: ServerApi
 Parameters:
   BucketName:
     Type: String
@@ -887,6 +937,10 @@ Parameters:
     Type: String
     Default: 'dedicated-game-server'
     Description: default is 'dedicated-game-server', use this to set your own server name
+  ExpirationBackup:
+    Type: Number
+    Default: 3
+    Description: Backup data will be expired in xx days. Default is 3 days.
   ServerSize:
     Type: String
     Default: t3.xlarge
@@ -915,16 +969,16 @@ Outputs:
         - '-'
         - !Ref AWS::Region
     Description: Bucket Name
-#  ServerApiEndpoint:
-#    Value:
-#      Fn::Join:
-#        - ''
-#        - - https://
-#          - Ref: ServerApi
-#          - '.execute-api.'
-#          - Ref: AWS::Region
-#          - '.'
-#          - Ref: AWS::URLSuffix
-#          - '/'
-#          - Ref: ServerApiDeploymentStageProd
-#          - '/'
+  ServerApiEndpoint:
+    Value:
+      Fn::Join:
+        - ''
+        - - https://
+          - Ref: ServerApi
+          - '.execute-api.'
+          - Ref: AWS::Region
+          - '.'
+          - Ref: AWS::URLSuffix
+          - '/'
+          - Ref: ServerApiDeploymentStageProd
+          - '/'
