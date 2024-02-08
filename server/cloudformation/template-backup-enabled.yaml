@@ -70,28 +70,6 @@ Resources:
         Ref: PublicSubnetRouteTable
     DependsOn:
       - VPCGWATT
-#  PublicSubnetEIP:
-#    Type: AWS::EC2::EIP
-#    Properties:
-#      Domain: vpc
-#      Tags:
-#        - Key: Name
-#          Value: CodeStack/Vpc/publicSubnet1
-#  PublicSubnetNATGateway:
-#    Type: AWS::EC2::NatGateway
-#    Properties:
-#      AllocationId:
-#        Fn::GetAtt:
-#          - PublicSubnetEIP
-#          - AllocationId
-#      SubnetId:
-#        Ref: PublicSubnet1
-#      Tags:
-#        - Key: Name
-#          Value: CodeStack/Vpc/publicSubnet1
-#    DependsOn:
-#      - PublicSubnetDefaultRoute
-#      - PublicSubnetRouteTableAssociation
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -202,14 +180,14 @@ Resources:
         Ref: PrivateSubnet1RouteTable
       SubnetId:
         Ref: PrivateSubnet1
-#  PrivateSubnet1DefaultRoute:
-#    Type: AWS::EC2::Route
-#    Properties:
-#      DestinationCidrBlock: 0.0.0.0/0
-#      NatGatewayId:
-#        Ref: PublicSubnetNATGateway
-#      RouteTableId:
-#        Ref: PrivateSubnet1RouteTable
+  #  PrivateSubnet1DefaultRoute:
+  #    Type: AWS::EC2::Route
+  #    Properties:
+  #      DestinationCidrBlock: 0.0.0.0/0
+  #      NatGatewayId:
+  #        Ref: PublicSubnetNATGateway
+  #      RouteTableId:
+  #        Ref: PrivateSubnet1RouteTable
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -240,14 +218,14 @@ Resources:
         Ref: PrivateSubnet2RouteTable
       SubnetId:
         Ref: PrivateSubnet2
-#  PrivateSubnet2DefaultRoute:
-#    Type: AWS::EC2::Route
-#    Properties:
-#      DestinationCidrBlock: 0.0.0.0/0
-#      NatGatewayId:
-#        Ref: PublicSubnetNATGateway
-#      RouteTableId:
-#        Ref: PrivateSubnet2RouteTable
+  #  PrivateSubnet2DefaultRoute:
+  #    Type: AWS::EC2::Route
+  #    Properties:
+  #      DestinationCidrBlock: 0.0.0.0/0
+  #      NatGatewayId:
+  #        Ref: PublicSubnetNATGateway
+  #      RouteTableId:
+  #        Ref: PrivateSubnet2RouteTable
   PrivateSubnet3:
     Type: AWS::EC2::Subnet
     Properties:
@@ -278,14 +256,14 @@ Resources:
         Ref: PrivateSubnet3RouteTable
       SubnetId:
         Ref: PrivateSubnet3
-#  PrivateSubnet3DefaultRoute:
-#    Type: AWS::EC2::Route
-#    Properties:
-#      DestinationCidrBlock: 0.0.0.0/0
-#      NatGatewayId:
-#        Ref: PublicSubnetNATGateway
-#      RouteTableId:
-#        Ref: PrivateSubnet3RouteTable
+  #  PrivateSubnet3DefaultRoute:
+  #    Type: AWS::EC2::Route
+  #    Properties:
+  #      DestinationCidrBlock: 0.0.0.0/0
+  #      NatGatewayId:
+  #        Ref: PublicSubnetNATGateway
+  #      RouteTableId:
+  #        Ref: PrivateSubnet3RouteTable
   VPCIGW:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -618,16 +596,16 @@ Resources:
             Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
-        Version: "2012-10-17"
+        Version: '2012-10-17'
       ManagedPolicyArns:
         - Fn::Join:
-            - ""
-            - - "arn:"
+            - ''
+            - - 'arn:'
               - Ref: AWS::Partition
               - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - Fn::Join:
-            - ""
-            - - "arn:"
+            - ''
+            - - 'arn:'
               - Ref: AWS::Partition
               - :iam::aws:policy/AmazonSSMFullAccess
   BackupFunction:
@@ -655,19 +633,19 @@ Resources:
               Name: documentName,
             };
             const ssmClient = new SSMClient();
-          
+
             try{
               const createAssociationCommand = new CreateAssociationCommand(associationParams);
               const data = await ssmClient.send(createAssociationCommand);
               console.log('Association created successfully:', data);
-          
+
               // Return a response if needed
               return {
                 statusCode: 200,
                 body: JSON.stringify({ message: 'Association created successfully' }),
-        
+
               }
-        
+
             } catch (error) {
               console.error('Error creating association:', error);
                 
@@ -695,10 +673,12 @@ Resources:
           Id: Target0
           Input:
             Fn::Join:
-              - ""
+              - ''
               - - '{"instanceId":"'
                 - Ref: GameServerInstance
-                - '","documentName":"backup-document"}'
+                - '","documentName":"'
+                - Ref: AWS::StackName
+                - '-backup-document"}'
   BackupFunctionAllowRuleTrigger:
     Type: AWS::Lambda::Permission
     Properties:
@@ -716,7 +696,7 @@ Resources:
     Type: AWS::SSM::Document
     Properties:
       Content:
-        schemaVersion: "2.2"
+        schemaVersion: '2.2'
         description: Backup Document
         mainSteps:
           - action: aws:runShellScript
@@ -729,7 +709,7 @@ Resources:
                 - formatted_time=$(date -d "@$rounded_time" "+%Y-%m-%d %H:%M:%S %Z" -u)
                 - sudo zip -r ${rounded_time}.zip ./
                 - Fn::Join:
-                    - ""
+                    - ''
                     - - s3path=s3://
                       - Ref: BucketName
                       - '-'
@@ -740,7 +720,156 @@ Resources:
                       - Ref: GameServerInstance
                 - aws s3 cp ./${rounded_time}.zip ${s3path}/${rounded_time}.zip
       DocumentType: Command
-      Name: backup-document
+      Name: !Join
+        - ''
+        - - !Ref AWS::StackName
+          - -backup-document
+  RestoreDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '2.2'
+        description: Backup Document
+        parameters:
+          timestamp:
+            type: String
+            description: restore no later than this timestamp
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              runCommand:
+                - cd /palworld-server/Pal/Saved/SaveGames
+                - current_time=$(date +%s)
+                - restore_time=$(({{ timestamp }} / 1800 * 1800))
+                - sudo zip -r restore-backup-${current_time}.zip ./
+                - Fn::Join:
+                    - ''
+                    - - s3path=s3://
+                      - Ref: BucketName
+                      - '-'
+                      - Ref: AWS::AccountId
+                      - '-'
+                      - Ref: AWS::Region
+                      - /
+                      - Ref: GameServerInstance
+                - aws s3 cp ./restore-backup-${current_time}.zip ${s3path}/restore-backup-${current_time}.zip
+                - aws s3 cp ${s3path}/${restore_time}.zip ./restore-file.zip
+                - sudo rm -rf ./
+                - sudo unzip ./restore-file.zip
+      DocumentType: Command
+      Name: !Join
+        - ''
+        - - !Ref AWS::StackName
+          - -restore-document
+  RestoreFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Role: !Sub ${RestoreFunctionRole.Arn}
+      Timeout: 300
+      Code:
+        ZipFile: |
+          const ssm = require('@aws-sdk/client-ssm');
+          const SSMClient = ssm.SSMClient;
+          const CreateAssociationCommand = ssm.CreateAssociationCommand;
+            
+          exports.handler = async function (event, context) { 
+            console.log('hello world');
+          }
+    DependsOn:
+      - RestoreFunctionRole
+  RestoreFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonSSMFullAccess
+  ServerApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Server Operation Service
+      Name: Server Operation Service
+  ServerApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      Description: This service serves server operations.
+      RestApiId:
+        Ref: ServerApi
+      StageName: prod
+    DependsOn:
+      - ServerApi
+  ServerApiDeploymentStageProd:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ServerApiDeployment
+      RestApiId:
+        Ref: ServerApi
+      StageName: prod
+  ServerApiAllowLambdaInvocationPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - RestoreFunction
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: ServerApi
+            - '/'
+            - Ref: ServerApiDeploymentStageProd
+            - '/GET/'
+  ServerApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        RequestTemplates:
+          application/json: '{ "statusCode": "200" }'
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - ':lambda:path/2015-03-31/functions/'
+              - Fn::GetAtt:
+                  - RestoreFunction
+                  - Arn
+              - '/invocations'
+      ResourceId:
+        Fn::GetAtt:
+          - ServerApi
+          - RootResourceId
+      RestApiId:
+        Ref: ServerApi
 Parameters:
   BucketName:
     Type: String
@@ -779,10 +908,23 @@ Outputs:
     Description: Game Server Instance EIP
   BucketName:
     Value: !Join
-             - ''
-             - - !Ref BucketName
-               - '-'
-               - !Ref AWS::AccountId
-               - '-'
-               - !Ref AWS::Region
+      - ''
+      - - !Ref BucketName
+        - '-'
+        - !Ref AWS::AccountId
+        - '-'
+        - !Ref AWS::Region
     Description: Bucket Name
+  ServerApiEndpoint:
+    Value:
+      Fn::Join:
+        - ''
+        - - https://
+          - Ref: ServerApi
+          - '.execute-api.'
+          - Ref: AWS::Region
+          - '.'
+          - Ref: AWS::URLSuffix
+          - '/'
+          - Ref: ServerApiDeploymentStageProd
+          - '/'

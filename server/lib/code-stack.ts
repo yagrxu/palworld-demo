@@ -7,6 +7,8 @@ import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {LambdaFunction} from "aws-cdk-lib/aws-events-targets";
 import * as events from 'aws-cdk-lib/aws-events';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+
 
 export class CodeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, privateProps : PrivateProps, props?: cdk.StackProps) {
@@ -19,10 +21,9 @@ export class CodeStack extends cdk.Stack {
 
     // create a vpc
     const vpc = new cdk.aws_ec2.Vpc(this, 'Vpc', {
-      //ipAddresses: this
       cidr: '10.0.0.0/16',
       maxAzs: 3,
-      natGateways: 1,
+      natGateways: 0,
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -31,13 +32,11 @@ export class CodeStack extends cdk.Stack {
           mapPublicIpOnLaunch: true
         },
         {
-
           cidrMask: 24,
           name: 'private',
           subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
         }
       ],
-
       vpcName: `palworld-cdk-demo-${this.region}`,
     });
 
@@ -56,7 +55,7 @@ export class CodeStack extends cdk.Stack {
     // create an EIP
     const eip = new cdk.aws_ec2.CfnEIP(this, 'server-eip');
 
-    //setup an ec2 instance in the vpc with default security group, using Ubuntu 20
+    //set up an ec2 instance in the vpc with default security group, using Ubuntu 20
     const instance = new cdk.aws_ec2.Instance(this, 'Instance', {
       vpc,
       instanceName: privateProps.serverName,
@@ -78,7 +77,7 @@ export class CodeStack extends cdk.Stack {
       instanceId: instance.instanceId
     })
     BootstrapContent.bootstrapCommand[1] = BootstrapContent.bootstrapCommand[1].replace('[BUCKET_NAME]', bucket.bucketName)
-    const ssmDoc = new cdk.aws_ssm.CfnDocument(this, 'MySSMDocument', {
+    new cdk.aws_ssm.CfnDocument(this, 'MySSMDocument', {
       name: 'bootstrap-document',
       documentType: 'Command',
       content: {
@@ -96,7 +95,7 @@ export class CodeStack extends cdk.Stack {
       },
     });
     // Create SSM association to run the document on the instance
-    const bootstrap = new cdk.aws_ssm.CfnAssociation(this, 'MySSMAssociation', {
+    new cdk.aws_ssm.CfnAssociation(this, 'MySSMAssociation', {
       name: 'bootstrap-document',
       targets: [
         {
@@ -107,6 +106,40 @@ export class CodeStack extends cdk.Stack {
       associationName: 'bootstrap-association',
     });
 
+    new cdk.aws_ssm.CfnDocument(this, 'RestoreDocument', {
+      name: 'restore-document',
+      documentType: 'Command',
+      content: {
+        schemaVersion: '2.2',
+        description: 'Restore Document',
+        parameters: {
+          timestamp: {
+            type: 'String',
+            description: 'timestamp for restore data, get saved data no later than this time'
+          }
+        },
+        mainSteps: [
+          {
+            action: 'aws:runShellScript',
+            name: 'runShellScript',
+            inputs: {
+              runCommand: [
+                'cd /palworld-server/Pal/Saved/SaveGames',
+                'current_time=$(date +%s)',
+                'restore_time=$(({{ timestamp }} / 1800 * 1800))',
+                'sudo zip -r restore-backup-${current_time}.zip ./',
+                `s3path=s3://${bucket.bucketName}/${instance.instanceId}`,
+                'aws s3 cp ./restore-backup-${current_time}.zip ${s3path}/restore-backup-${current_time}.zip',
+                'aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip',
+                'sudo rm -rf /palworld-server/Pal/Saved/SaveGames/*',
+                'sudo unzip /palworld-server/Pal/Saved/SaveGames/restore-file.zip',
+                'sudo rm /palworld-server/Pal/Saved/SaveGames/restore-file.zip'
+              ],
+            },
+          },
+        ],
+      },
+    });
     const backupDoc = new cdk.aws_ssm.CfnDocument(this, 'BackupDocument', {
       name: 'backup-document',
       documentType: 'Command',
@@ -125,7 +158,7 @@ export class CodeStack extends cdk.Stack {
                   'formatted_time=$(date -d "@$rounded_time" "+%Y-%m-%d %H:%M:%S %Z" -u)',
 
                   'sudo zip -r ${rounded_time}.zip ./',
-                  `s3path=s3://${bucket.bucketName}/${instance.instanceId}/`,
+                  `s3path=s3://${bucket.bucketName}/${instance.instanceId}`,
                   'aws s3 cp ./${rounded_time}.zip ${s3path}/${rounded_time}.zip'
               ],
             },
@@ -167,6 +200,28 @@ export class CodeStack extends cdk.Stack {
         event: events.RuleTargetInput.fromObject({ instanceId: instance.instanceId, documentName: backupDoc.name })
       })],
     });
+
+    // Restore API
+    const restoreFunction = new lambda.Function(this, 'restoreFunction', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      code: lambda.Code.fromAsset('resources'),
+      handler: 'restore.main',
+      environment: {}
+    });
+
+    bucket.grantReadWrite(restoreFunction);
+
+    const serverApi = new apigateway.RestApi(this, 'server-operation-apigw', {
+      restApiName: 'Service Operation API',
+      description: 'This service serves server operations.'
+    });
+
+    const restoreApi = new apigateway.LambdaIntegration(restoreFunction, {
+      requestTemplates: {'application/json': '{ "statusCode": "200" }'}
+    });
+
+    serverApi.root.addMethod('POST', restoreApi);
+
   }
 }
 export interface PrivateProps {

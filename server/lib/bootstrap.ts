@@ -3,6 +3,7 @@ import {aws_ec2, aws_ssm} from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cdk from "aws-cdk-lib";
 import {PrivateProps} from "./code-stack";
+import {LifecycleRule} from "aws-cdk-lib/aws-s3/lib/rule";
 
 export class BootstrapContent {
     static bootstrapCommand = [
@@ -91,17 +92,19 @@ export class BootstrapContent {
 
     static resolveS3Bucket(scope: Construct, region: string, accountId: string, props: PrivateProps){
         const toCreate: string = props.createBucket;
-        const bucketName: string = props.bucketName || `palworld-cdk-demo-${accountId}-${region}`;
+        const bucketName: string = props.bucketName || `game-server-cdk-demo-${accountId}-${region}`;
         if(toCreate === 'true') {
-            return new s3.Bucket(scope, `palworld-cdk-demo-${accountId}`, {
+            const backupBucket = new s3.Bucket(scope, `game-server-cdk-demo-${accountId}`, {
                 // default is already blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
                 removalPolicy: cdk.RemovalPolicy.DESTROY,
                 autoDeleteObjects: true,
                 bucketName: bucketName,
             });
+            // backupBucket.addLifecycleRule(new LifecycleRule())
+            return backupBucket;
         }
         else{
-            return s3.Bucket.fromBucketArn(scope, `palworld-cdk-demo-${accountId}`,`arn:aws:s3:::${bucketName}`);
+            return s3.Bucket.fromBucketArn(scope, `game-server-cdk-demo-${accountId}`,`arn:aws:s3:::${bucketName}`);
         }
     }
 
