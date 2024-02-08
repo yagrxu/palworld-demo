@@ -206,7 +206,14 @@ export class CodeStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('resources'),
       handler: 'restore.main',
-      environment: {}
+      environment: {},
+      initialPolicy: [
+        // Define your initial IAM policy statements here
+        new iam.PolicyStatement({
+          actions: ['ssm:*'],
+          resources: ['*']
+        }),
+      ],
     });
 
     bucket.grantReadWrite(restoreFunction);
