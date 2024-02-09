@@ -724,6 +724,7 @@ Resources:
                       - /
                       - Ref: GameServerInstance
                 - aws s3 cp ./${rounded_time}.zip ${s3path}/${rounded_time}.zip
+                - sudo rm ./${rounded_time}.zip
       DocumentType: Command
       Name: !Join
         - ''
