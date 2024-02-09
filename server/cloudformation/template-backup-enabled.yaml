@@ -1,5 +1,18 @@
 ---
 Resources:
+#specify api GW IAM role
+  ApiGatewayExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
   GameBackupBucket:
     Condition: createBucket
     Type: AWS::S3::Bucket
@@ -922,6 +935,10 @@ Resources:
                   - RestoreFunction
                   - Arn
               - '/invocations'
+        Credentials:
+          Fn::GetAtt:
+            - ApiGatewayExecutionRole
+            - Arn          
       ResourceId:
         Fn::GetAtt:
           - ServerApi
