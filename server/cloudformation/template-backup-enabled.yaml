@@ -893,7 +893,7 @@ Resources:
             - Ref: ServerApi
             - '/'
             - Ref: ServerApiDeploymentStageProd
-            - '/GET/'
+            - '/POST/'
   ServerApiMethod:
     Type: AWS::ApiGateway::Method
     Properties:
