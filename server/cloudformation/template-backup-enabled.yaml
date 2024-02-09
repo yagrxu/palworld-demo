@@ -398,6 +398,12 @@ Resources:
         Ref: InstanceProfile
       ImageId: !Ref UbuntuAmi
       InstanceType: !Ref ServerSize
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            DeleteOnTermination: true
+            VolumeSize: 30
       KeyName: !Join
         - ''
         - - 'pal-server-keypair'
