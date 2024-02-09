@@ -759,8 +759,9 @@ Resources:
                       - Ref: AWS::Region
                       - /
                       - Ref: GameServerInstance
-                - aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - aws s3 restore-backup-${current_time}.zip cp ${s3path}/restore-backup-${current_time}.zip
                 - sudo rm -rf /palworld-server/Pal/Saved/SaveGames/*
+                - aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
                 - sudo unzip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
                 - sudo rm /palworld-server/Pal/Saved/SaveGames/restore-file.zip
       DocumentType: Command
