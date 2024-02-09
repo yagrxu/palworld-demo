@@ -8,7 +8,7 @@ Resources:
         Rules:
           - Id: DeleteOldBackups
             Status:  Enabled
-            ExpirationInDays: !Ref BackupExpiration
+            ExpirationInDays: !Ref ExpirationBackup
       BucketName: !Join
         - ''
         - - !Ref BucketName
@@ -898,7 +898,7 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       AuthorizationType: NONE
-      HttpMethod: GET
+      HttpMethod: POST
       Integration:
         IntegrationHttpMethod: POST
         RequestTemplates:
