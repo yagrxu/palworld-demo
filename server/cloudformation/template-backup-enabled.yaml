@@ -1,18 +1,5 @@
 ---
 Resources:
-#specify api GW IAM role
-  ApiGatewayExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
   GameBackupBucket:
     Condition: createBucket
     Type: AWS::S3::Bucket
@@ -20,7 +7,7 @@ Resources:
       LifecycleConfiguration:
         Rules:
           - Id: DeleteOldBackups
-            Status:  Enabled
+            Status: Enabled
             ExpirationInDays: !Ref ExpirationBackup
       BucketName: !Join
         - ''
@@ -778,10 +765,10 @@ Resources:
                       - Ref: AWS::Region
                       - /
                       - Ref: GameServerInstance
-                - aws s3 restore-backup-${current_time}.zip cp ${s3path}/restore-backup-${current_time}.zip
+                - aws s3 cp restore-backup-${current_time}.zip ${s3path}/restore-backup-${current_time}.zip
                 - sudo rm -rf /palworld-server/Pal/Saved/SaveGames/*
-                - aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
-                - sudo unzip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - sudo aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - sudo unzip -o /palworld-server/Pal/Saved/SaveGames/restore-file.zip
                 - sudo rm /palworld-server/Pal/Saved/SaveGames/restore-file.zip
       DocumentType: Command
       Name: !Join
@@ -798,9 +785,9 @@ Resources:
       Environment:
         Variables:
           DocumentName: !Join
-                      - ''
-                      - - !Ref AWS::StackName
-                        - '-restore-document'
+            - ''
+            - - !Ref AWS::StackName
+              - '-restore-document'
       Code:
         ZipFile: |
           const ssm = require('@aws-sdk/client-ssm');
@@ -819,11 +806,11 @@ Resources:
               Parameters: {
                 timestamp: [ body.timestamp ]
               },
-              AssociationName: 'restore-' + event.instanceId,
+              AssociationName: 'restore-' + body.instanceId,
               Name: documentName,
             };
             const ssmClient = new SSMClient();
-        
+
             try{
               const createAssociationCommand = new CreateAssociationCommand(associationParams);
               const data = await ssmClient.send(createAssociationCommand);
@@ -835,7 +822,7 @@ Resources:
               body: JSON.stringify({ message: 'Association created successfully' }),
             
               }
-          
+
             } catch (error) {
               console.error('Error creating association:', error);
               
@@ -935,10 +922,6 @@ Resources:
                   - RestoreFunction
                   - Arn
               - '/invocations'
-        Credentials:
-          Fn::GetAtt:
-            - ApiGatewayExecutionRole
-            - Arn          
       ResourceId:
         Fn::GetAtt:
           - ServerApi
