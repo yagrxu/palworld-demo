@@ -1,0 +1,338 @@
+---
+Resources:
+  GameBackupBucket:
+    Condition: createBucket
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            ExpirationInDays: !Ref ExpirationBackup
+      BucketName: !Join
+        - ''
+        - - !Ref BucketName
+          - '-'
+          - !Ref AWS::AccountId
+          - '-'
+          - !Ref AWS::Region
+      Tags:
+        - Key: aws-cdk:auto-delete-objects
+          Value: 'true'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Retain
+  GameServerVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - 'palworld-cdk-demo'
+              - '-'
+              - !Ref AWS::Region
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: CodeStack/Vpc/publicSubnet1
+      VpcId:
+        Ref: GameServerVPC
+  PublicSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CodeStack/Vpc/publicSubnet1
+      VpcId:
+        Ref: GameServerVPC
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicSubnetRouteTable
+      SubnetId:
+        Ref: PublicSubnet1
+  PublicSubnetDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: VPCIGW
+      RouteTableId:
+        Ref: PublicSubnetRouteTable
+    DependsOn:
+      - VPCGWATT
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: CodeStack/Vpc/PublicSubnet2
+      VpcId:
+        Ref: GameServerVPC
+  PublicSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CodeStack/Vpc/publicSubnet2
+      VpcId:
+        Ref: GameServerVPC
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicSubnet2RouteTable
+      SubnetId:
+        Ref: PublicSubnet2
+  PublicSubnet2DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: VPCIGW
+      RouteTableId:
+        Ref: PublicSubnet2RouteTable
+    DependsOn:
+      - VPCGWATT
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [2, !GetAZs '']
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: CodeStack/Vpc/publicSubnet3
+      VpcId:
+        Ref: GameServerVPC
+  PublicSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CodeStack/Vpc/publicSubnet3
+      VpcId:
+        Ref: GameServerVPC
+  PublicSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicSubnet3RouteTable
+      SubnetId:
+        Ref: PublicSubnet3
+  PublicSubnet3DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: VPCIGW
+      RouteTableId:
+        Ref: PublicSubnet3RouteTable
+    DependsOn:
+      - VPCGWATT
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: CodeStack/Vpc/privateSubnet1
+      VpcId:
+        Ref: GameServerVPC
+  PrivateSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CodeStack/Vpc/privateSubnet1
+      VpcId:
+        Ref: GameServerVPC
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnet1RouteTable
+      SubnetId:
+        Ref: PrivateSubnet1
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.4.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: CodeStack/Vpc/privateSubnet2
+      VpcId:
+        Ref: GameServerVPC
+  PrivateSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CodeStack/Vpc/privateSubnet2
+      VpcId:
+        Ref: GameServerVPC
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnet2RouteTable
+      SubnetId:
+        Ref: PrivateSubnet2
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [2, !GetAZs '']
+      CidrBlock: 10.0.5.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: CodeStack/Vpc/privateSubnet3
+      VpcId:
+        Ref: GameServerVPC
+  PrivateSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CodeStack/Vpc/privateSubnet3
+      VpcId:
+        Ref: GameServerVPC
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnet3RouteTable
+      SubnetId:
+        Ref: PrivateSubnet3
+  VPCIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - 'palworld-cdk-demo'
+              - '-'
+              - !Ref AWS::Region
+  VPCGWATT:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: VPCIGW
+      VpcId:
+        Ref: GameServerVPC
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH (TCP port 22) in
+      GroupName: palworld-cdk-demo-613477150601
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: '-1'
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow SSH Access
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          Description: Allow 8211 tcp Access
+          FromPort: 8211
+          IpProtocol: tcp
+          ToPort: 8211
+        - CidrIp: 0.0.0.0/0
+          Description: Allow 8211 udp Access
+          FromPort: 8211
+          IpProtocol: udp
+          ToPort: 8211
+      VpcId:
+        Ref: GameServerVPC
+  GameServerKeyPair:
+    Condition: createKeyPair
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyFormat: pem
+      KeyName: !Join
+        - ''
+        - - 'pal-server-keypair'
+          - '-'
+          - !Ref AWS::Region
+      KeyType: rsa
+    DeletionPolicy: Retain
+Parameters:
+  BucketName:
+    Type: String
+    Default: 'game-server-cdk-demo'
+    Description: default value will be transformed to 'game-server-cdk-demo-<account-id>-<region>', use this to set your own bucket name
+  CreateBucket:
+    Type: String
+    Default: 'false'
+    Description: default is 'false', use 'true' if you want to create bucket. Please Note! bucket deletion policy is retain. Therefore as long as it is created and not manually deleted, you do not need to create it again.
+  CreateKeyPair:
+    Type: String
+    Default: 'false'
+    Description: default is 'false', use 'true' if you want to create key pair. Please Note! bucket deletion policy is retain. Therefore as long as it is created and not manually deleted, you do not need to create it again.
+  ExpirationBackup:
+    Type: Number
+    Default: 3
+    Description: Backup data will be expired in xx days. Default is 3 days.
+Conditions:
+  createBucket: !Equals [!Ref CreateBucket, 'true']
+  createKeyPair: !Equals [!Ref CreateKeyPair, 'true']
+
+Outputs:
+  BucketName:
+    Value: !Join
+      - ''
+      - - !Ref BucketName
+        - '-'
+        - !Ref AWS::AccountId
+        - '-'
+        - !Ref AWS::Region
+    Description: Bucket Name
+  VpcId:
+    Value: !Ref GameServerVPC
+    Description: VPC ID

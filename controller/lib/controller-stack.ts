@@ -1,46 +1,37 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
-import * as sqs from 'aws-cdk-lib/aws-sqs';
-import {Attribute, AttributeType} from "aws-cdk-lib/aws-dynamodb/lib/shared";
+import {Util} from "./util";
+import {Asset} from "aws-cdk-lib/aws-s3-assets";
+import {Notifications} from "./notifications";
+import {ApiFunction} from "./api-functions";
+import {ControllerApi} from "./api";
+import {Storage} from "./storage";
 
 export class ControllerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    const handler = new lambda.Function(this, 'controller-main', {
-      runtime: lambda.Runtime.NODEJS_18_X,
-      code: lambda.Code.fromAsset('resources'),
-      handler: 'controller.main',
-      environment: {}
+
+    // get account ID
+    const accountId = cdk.Stack.of(this).account;
+
+    // create S3 bucket
+    const backupBucket = Util.resolveS3Bucket(this, this.region, accountId);
+    const serverTemplate = new Asset(this, 'server-template-v0.0.1', {
+      path: 'cloudformation/template-server-v1.yaml',
+    });
+    const networksTemplate = new Asset(this, 'networks-template-v0.0.1', {
+      path: 'cloudformation/template-networks-v1.yaml',
     });
 
+    const cfCreationTopic = Notifications.createCfNotificationTopic(this, 'cf-creation-topic');
+    const cfOpsTopic = Notifications.createOpsNotificationTopic(this, 'cf-callback-topic');
+    ApiFunction.createCfCallbackHandler(this, cfOpsTopic);
+    ControllerApi.createServerApis(this, cfCreationTopic);
+    // serverTemplate.bucket.grantRead()
     // bucket.grantReadWrite(handler);
 
-    const api = new apigateway.RestApi(this, 'controller-api', {
-      restApiName: 'controller Service',
-      description: 'This service serves platform orchestration.'
-    });
+    // storage
+    Storage.createDynamoDbTables(this);
 
-    const test = new apigateway.LambdaIntegration(handler, {
-      requestTemplates: {'application/json': '{ "statusCode": "200" }'}
-    });
-
-    api.root.addMethod('GET', test);
-
-    const serverTable = new dynamodb.Table(this, 'ServerTable', {
-      tableName: 'server-table',
-      pointInTimeRecovery: true,
-      partitionKey: {name: 'server-id', type: AttributeType.STRING},
-      sortKey: {name: 'server-name', type: AttributeType.STRING},
-    });
-    const sessionTable = new dynamodb.Table(this, 'ServerTable', {
-      tableName: 'server-session',
-      pointInTimeRecovery: true,
-      partitionKey: {name: 'server-id', type: AttributeType.STRING},
-      sortKey: {name: 'server-name', type: AttributeType.STRING},
-    });
   }
 }

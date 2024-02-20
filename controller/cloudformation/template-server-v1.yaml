@@ -1,0 +1,695 @@
+---
+Resources:
+  GameBackupBucket:
+    Condition: createBucket
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            ExpirationInDays: !Ref ExpirationBackup
+      BucketName: !Join
+        - ''
+        - - !Ref BucketName
+          - '-'
+          - !Ref AWS::AccountId
+          - '-'
+          - !Ref AWS::Region
+      Tags:
+        - Key: aws-cdk:auto-delete-objects
+          Value: 'true'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Retain
+  GameServerEIP:
+    Type: AWS::EC2::EIP
+  GameServerKeyPair:
+    Condition: createKeyPair
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyFormat: pem
+      KeyName: !Join
+        - ''
+        - - 'pal-server-keypair'
+          - '-'
+          - !Ref AWS::Region
+      KeyType: rsa
+    DeletionPolicy: Retain
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - ':iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - ':iam::aws:policy/AmazonS3FullAccess'
+      Tags:
+        - Key: Name
+          Value: palworld-game-server
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: InstanceRole
+  GameServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      IamInstanceProfile:
+        Ref: InstanceProfile
+      ImageId: !Ref UbuntuAmi
+      InstanceType: !Ref ServerSize
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            DeleteOnTermination: true
+            VolumeSize: 30
+      KeyName: !Join
+        - ''
+        - - 'pal-server-keypair'
+          - '-'
+          - !Ref AWS::Region
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      SubnetId:
+        Ref: SubnetId
+      Tags:
+        - Key: Name
+          Value: !Ref ServerName
+        - Key: StackName
+          Value: !Ref ServerStackName
+      UserData:
+        Fn::Base64: '#!/bin/bash'
+    DependsOn:
+      - InstanceRole
+  GameServerEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - GameServerEIP
+          - AllocationId
+      InstanceId:
+        Ref: GameServerInstance
+  BootstrapDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '2.2'
+        description: Simple SSM Document
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              runCommand:
+                - echo "bootstrap started"
+                - Fn::Join:
+                    - ''
+                    - - 'bucketName='
+                      - Ref: BucketName
+                      - '-'
+                      - Ref: AWS::AccountId
+                      - '-'
+                      - Ref: AWS::Region
+                - mkdir /opt/steam
+                - mkdir /palworld-server
+
+                - echo "[INFO] INSTALLING SOFTWARE"
+                - sudo apt-get update
+                - sudo apt-get install -y curl lib32gcc1 lsof git awscli
+                - sudo apt install zip -y
+                - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                - unzip awscliv2.zip
+                - sudo ./aws/install
+
+                - echo "[INFO] INIT S3 DIRECTORY FOR BACKUP"
+                - instanceId=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`
+                - aws s3api put-object --bucket ${bucketName} --key ${instanceId}/ --content-length 0
+
+                - echo "[INFO] DOWNLOADING AND INSTALLING STEAM CMD"
+                - wget -P /opt/steam https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+                - yes "" | sudo add-apt-repository multiverse
+                - yes "" | sudo dpkg --add-architecture i386
+                - sudo apt update
+                - tar -xzf /opt/steam/steamcmd_linux.tar.gz -C /opt/steam
+                - chmod 755 /opt/steam/steamcmd.sh
+
+                - echo "[INFO] CREATING STEAM USER"
+                - useradd -m -U steam
+                - chown -R steam:steam /palworld-server
+
+                - echo "[INFO] SETTING UP STEAMCMD INSTALLER TO DOWNLOAD PALWORLD"
+                - sudo chown -R steam:steam /opt/steam
+                - |-
+                  echo "@NoPromptForPassword 1
+                  force_install_dir /palworld-server
+                  login anonymous
+                  app_update 2394010 validate
+                  quit" > /opt/steam/download-palworld.txt
+
+                - echo "[INFO] DOWNLOADING PALWORLD"
+                - sudo -u steam /opt/steam/steamcmd.sh +runscript /opt/steam/download-palworld.txt
+                - sudo -u steam mkdir -p /home/steam/.steam/sdk64/
+                - sudo -u steam /opt/steam/steamcmd.sh +login anonymous +app_update 1007
+                  +quit
+                - sleep 60
+                - sudo -u steam cp "/home/steam/Steam/steamapps/common/Steamworks SDK
+                  Redist/linux64/steamclient.so" /home/steam/.steam/sdk64/
+
+                - echo "[INFO] CREATING SYSTEMD SERVICE PALWORLD"
+                - |-
+                  sudo echo "[Unit]
+                  Description=Palworld Dedicated Server
+                  After=network.target
+
+                  [Service]
+                  Type=simple
+                  LimitNOFILE=10000
+                  User=steam
+                  Group=steam
+                  ExecStartPre=/opt/steam/steamcmd.sh +runscript /opt/steam/download-palworld.txt
+                  WorkingDirectory=/palworld-server
+                  ExecStart=/palworld-server/PalServer.sh EpicApp=PalServer
+
+                  Restart=on-failure
+                  RestartSec=20s
+
+                  [Install]
+                  WantedBy=multi-user.target" > /etc/systemd/system/palworld.service
+                - sudo mkdir -p /palworld-server/Pal/Saved/Config/LinuxServer/
+                - |-
+                  sudo echo "[/Script/Pal.PalGameWorldSettings]
+                  OptionSettings=(Difficulty=${difficulty},DayTimeSpeedRate=${day_time_speed_rate},NightTimeSpeedRate=${night_time_speed_rate},ExpRate=${exp_rate},PalCaptureRate=${pal_capture_rate},PalSpawnNumRate=${pal_spawn_num_rate},PalDamageRateAttack=${pal_damage_rate_attack},PalDamageRateDefense=${pal_damage_rate_defense},PlayerDamageRateAttack=${player_damage_rate_attack},PlayerDamageRateDefense=${player_damage_rate_defense},PlayerStomachDecreaceRate=${player_stomach_decrease_rate},PlayerStaminaDecreaceRate=${player_stamina_decrease_rate},PlayerAutoHPRegeneRate=${player_auto_hp_regen_rate},PlayerAutoHpRegeneRateInSleep=${player_auto_hp_regen_rate_in_sleep},PalStomachDecreaceRate=${pal_stomach_decrease_rate},PalStaminaDecreaceRate=${pal_stamina_decrease_rate},PalAutoHPRegeneRate=${pal_auto_hp_regen_rate},PalAutoHpRegeneRateInSleep=${pal_auto_hp_regene_rate_in_sleep},BuildObjectDamageRate=${build_object_damage_rate},BuildObjectDeteriorationDamageRate=${build_object_deterioration_damage_rate},CollectionDropRate=${collection_drop_rate},CollectionObjectHpRate=${collection_object_hp_rate},CollectionObjectRespawnSpeedRate=${collection_object_respawn_speed_rate},EnemyDropItemRate=${enemy_drop_item_rate},DeathPenalty=${death_penalty},bEnablePlayerToPlayerDamage=${enable_player_to_player_damage},bEnableFriendlyFire=${enable_friendly_fire},bEnableInvaderEnemy=${enable_invader_enemy},bActiveUNKO=${active_unko},bEnableAimAssistPad=${enable_aim_assist_pad},bEnableAimAssistKeyboard=${enable_aim_assist_keyboard},DropItemMaxNum=${drop_item_max_num},DropItemMaxNum_UNKO=${drop_item_max_num_unko},BaseCampMaxNum=${base_camp_max_num},BaseCampWorkerMaxNum=${base_camp_worker_max_num},DropItemAliveMaxHours=${drop_item_alive_max_hours},bAutoResetGuildNoOnlinePlayers=${auto_reset_guild_no_online_players},AutoResetGuildTimeNoOnlinePlayers=${auto_reset_guild_time_no_online_players},GuildPlayerMaxNum=${guild_player_max_num},PalEggDefaultHatchingTime=${pal_egg_default_hatching_time},WorkSpeedRate=${work_speed_rate},bIsMultiplay=${is_multiplay},bIsPvP=${is_pvp},bCanPickupOtherGuildDeathPenaltyDrop=${can_pickup_other_guild_death_penalty_drop},bEnableNonLoginPenalty=${enable_non_login_penalty},bEnableFastTravel=${enable_fast_travel},bIsStartLocationSelectByMap=${is_start_location_select_by_map},bExistPlayerAfterLogout=${exist_player_after_logout},bEnableDefenseOtherGuildPlayer=${enable_defense_other_guild_player},CoopPlayerMaxNum=${coop_player_max_num},ServerPlayerMaxNum=${server_player_max_num},ServerName="${server_name}",ServerDescription="${server_description}",%{ if admin_password != "" ~}AdminPassword="${admin_password}",%{ else ~}AdminPassword="",%{ endif ~}%{ if server_password != "" ~}ServerPassword="${server_password}",%{ else ~}ServerPassword="",%{ endif ~}PublicPort=${public_port},%{ if public_ip != "" ~}PublicIP="${public_ip}",%{ else ~}PublicIP="",%{ endif ~}RCONEnabled=${enable_rcon},%{ if rcon_port != "" ~}RCONPort=${rcon_port},%{ else ~}RCONPort="",%{ endif ~}%{ if region != "" ~}Region="${region}",%{ else ~}Region="",%{ endif ~}bUseAuth=${use_auth},BanListURL="${ban_list_url}")" > /palworld-server/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
+                - chown -R steam:steam /palworld-server/Pal/Saved
+                - chmod -R 775 /palworld-server/Pal/Saved
+                - systemctl daemon-reload
+                - echo "[INFO] ENABLING PALWORLD.SERVICE"
+                - systemctl enable palworld
+                - echo "[INFO] STARTING PALWORLD.SERVICE"
+                - systemctl start palworld
+      DocumentType: Command
+      Name: !Join
+        - ''
+        - - !Ref AWS::StackName
+          - -dedicated-server-bootstrap-document-v0.1
+
+  MySSMAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: BootstrapAssociation
+      Name: !Ref BootstrapDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - Ref: GameServerInstance
+  DescribeImagesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DescribeImages
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action: ec2:DescribeImages
+                Effect: Allow
+                Resource: '*'
+  GetLatestAMI:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !Sub ${DescribeImagesRole.Arn}
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import json
+          import traceback
+
+          def handler(event, context):
+            try:
+              response = boto3.client('ec2').describe_images(
+                  Filters=[
+                    {'Name': 'name', 'Values': [event['ResourceProperties']['Name']]}
+                  ],
+              )
+
+              amis = sorted(response['Images'],
+                            key=lambda x: x['CreationDate'],
+                            reverse=True)
+              id = amis[0]['ImageId']
+
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, id)
+            except:
+              traceback.print_last()
+              cfnresponse.send(event, context, cfnresponse.FAIL, {}, "ok")
+  UbuntuAmi:
+    Type: Custom::FindAMI
+    Properties:
+      ServiceToken: !Sub ${GetLatestAMI.Arn}
+      Name: 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20240126'
+  BackupFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonSSMFullAccess
+  BackupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Role: !Sub ${BackupFunctionRole.Arn}
+      Timeout: 300
+      Code:
+        ZipFile: |
+          const ssm = require('@aws-sdk/client-ssm');
+          const SSMClient = ssm.SSMClient;
+          const CreateAssociationCommand = ssm.CreateAssociationCommand;
+            
+          exports.handler = async function (event, context) { 
+            console.log(event)
+            const documentName = event.documentName;
+            const targets = [
+             { Key: 'InstanceIds', Values: [event.instanceId] },
+            ];
+            const associationParams = {
+              Targets: targets,
+              AssociationName: 'bootstrap-' + event.instanceId,
+              Name: documentName,
+            };
+            const ssmClient = new SSMClient();
+
+            try{
+              const createAssociationCommand = new CreateAssociationCommand(associationParams);
+              const data = await ssmClient.send(createAssociationCommand);
+              console.log('Association created successfully:', data);
+
+              // Return a response if needed
+              return {
+                statusCode: 200,
+                body: JSON.stringify({ message: 'Association created successfully' }),
+
+              }
+
+            } catch (error) {
+              console.error('Error creating association:', error);
+                
+              // Return an error response
+              return {
+                statusCode: 500,
+                body: JSON.stringify({ error: 'Error creating association' }),
+              };
+            } finally {
+              // Close the SDK client to release resources
+              ssmClient.destroy();
+            }
+          }
+  BackupSchedulerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Schedule a Lambda that creates backup every 30 minutes
+      ScheduleExpression: cron(*/30 * * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - BackupFunction
+              - Arn
+          Id: Target0
+          Input:
+            Fn::Join:
+              - ''
+              - - '{"instanceId":"'
+                - Ref: GameServerInstance
+                - '","documentName":"'
+                - Ref: AWS::StackName
+                - '-backup-document"}'
+  BackupFunctionAllowRuleTrigger:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - BackupFunction
+          - Arn
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - BackupSchedulerRule
+          - Arn
+  BackupDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '2.2'
+        description: Backup Document
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              runCommand:
+                - cd /palworld-server/Pal/Saved/SaveGames
+                - current_time=$(date +%s)
+                - rounded_time=$((current_time / 1800 * 1800))
+                - formatted_time=$(date -d "@$rounded_time" "+%Y-%m-%d %H:%M:%S %Z" -u)
+                - sudo zip -r ${rounded_time}.zip ./
+                - Fn::Join:
+                    - ''
+                    - - s3path=s3://
+                      - Ref: BucketName
+                      - '-'
+                      - Ref: AWS::AccountId
+                      - '-'
+                      - Ref: AWS::Region
+                      - /
+                      - Ref: GameServerInstance
+                - aws s3 cp ./${rounded_time}.zip ${s3path}/${rounded_time}.zip
+                - sudo rm ./${rounded_time}.zip
+      DocumentType: Command
+      Name: !Join
+        - ''
+        - - !Ref AWS::StackName
+          - -backup-document
+  RestoreDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '2.2'
+        description: Backup Document
+        parameters:
+          timestamp:
+            type: String
+            description: restore no later than this timestamp
+          gameServerInstance:
+            type: String
+            description: GameServerInstance
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              runCommand:
+                - cd /palworld-server/Pal/Saved/SaveGames
+                - current_time=$(date +%s)
+                - restore_time=$(({{ timestamp }} / 1800 * 1800))
+                - sudo zip -r restore-backup-${current_time}.zip ./
+                - Fn::Join:
+                    - ''
+                    - - s3path=s3://
+                      - Ref: BucketName
+                      - '-'
+                      - Ref: AWS::AccountId
+                      - '-'
+                      - Ref: AWS::Region
+                      - /$({{ gameServerInstance }})
+                - aws s3 cp restore-backup-${current_time}.zip ${s3path}/restore-backup-${current_time}.zip
+                - sudo rm -rf /palworld-server/Pal/Saved/SaveGames/*
+                - sudo aws s3 cp ${s3path}/${restore_time}.zip /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - sudo unzip -o /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+                - sudo rm /palworld-server/Pal/Saved/SaveGames/restore-file.zip
+      DocumentType: Command
+      Name: !Join
+        - ''
+        - - !Ref AWS::StackName
+          - '-restore-document'
+  RestoreFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Role: !Sub ${RestoreFunctionRole.Arn}
+      Timeout: 300
+      Environment:
+        Variables:
+          DocumentName: !Join
+            - ''
+            - - !Ref AWS::StackName
+              - '-restore-document'
+      Code:
+        ZipFile: |
+          const ssm = require('@aws-sdk/client-ssm');
+          const SSMClient = ssm.SSMClient;
+          const CreateAssociationCommand = ssm.CreateAssociationCommand;
+            
+          exports.handler = async function (event, context) { 
+            console.log(event);
+            const body = JSON.parse(event.body)
+            const documentName = process.env.DocumentName;
+            const targets = [
+              { Key: 'InstanceIds', Values: [body.instanceId] },
+            ];
+            const associationParams = {
+              Targets: targets,
+              Parameters: {
+                timestamp: [ body.timestamp ],
+                gameServerInstance: [body.instanceId]
+              },
+              AssociationName: 'restore-' + body.instanceId,
+              Name: documentName,
+            };
+            const ssmClient = new SSMClient();
+
+            try{
+              const createAssociationCommand = new CreateAssociationCommand(associationParams);
+              const data = await ssmClient.send(createAssociationCommand);
+              console.log('Association created successfully:', data);
+              
+              // Return a response if needed
+              return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Association created successfully' }),
+            
+              }
+
+            } catch (error) {
+              console.error('Error creating association:', error);
+              
+              // Return an error response
+              return {
+              statusCode: 500,
+              body: JSON.stringify({ error: 'Error creating association' }),
+            };
+            } finally {
+              // Close the SDK client to release resources
+              ssmClient.destroy();
+            }
+          }
+    DependsOn:
+      - RestoreFunctionRole
+  RestoreFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - Fn::Join:
+            - ''
+            - - 'arn:'
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonSSMFullAccess
+  # ServerApi:
+  #   Type: AWS::ApiGateway::RestApi
+  #   Properties:
+  #     Description: Server Operation Service
+  #     Name: Server Operation Service
+  # ServerApiDeployment:
+  #   Type: AWS::ApiGateway::Deployment
+  #   Properties:
+  #     Description: This service serves server operations.
+  #     RestApiId:
+  #       Ref: ServerApi
+  #     StageName: prod
+  #   DependsOn:
+  #     - ServerApiMethod
+  # ServerApiDeploymentStageProd:
+  #   Type: AWS::ApiGateway::Stage
+  #   Properties:
+  #     DeploymentId:
+  #       Ref: ServerApiDeployment
+  #     RestApiId:
+  #       Ref: ServerApi
+  #     StageName: production
+  # ServerApiAllowLambdaInvocationPermissions:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName:
+  #       Fn::GetAtt:
+  #         - RestoreFunction
+  #         - Arn
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn:
+  #       Fn::Join:
+  #         - ''
+  #         - - 'arn:aws:execute-api:'
+  #           - Ref: AWS::Region
+  #           - ':'
+  #           - Ref: AWS::AccountId
+  #           - ':'
+  #           - Ref: ServerApi
+  #           - '/'
+  #           - Ref: ServerApiDeploymentStageProd
+  #           - '/*'
+  # ServerApiMethod:
+  #   Type: AWS::ApiGateway::Method
+  #   Properties:
+  #     AuthorizationType: NONE
+  #     HttpMethod: POST
+  #     Integration:
+  #       IntegrationHttpMethod: POST
+  #       RequestTemplates:
+  #         application/json: '{ "statusCode": "200" }'
+  #       Type: AWS_PROXY
+  #       Uri:
+  #         Fn::Join:
+  #           - ''
+  #           - - 'arn:aws:apigateway:'
+  #             - Ref: AWS::Region
+  #             - ':lambda:path/2015-03-31/functions/'
+  #             - Fn::GetAtt:
+  #                 - RestoreFunction
+  #                 - Arn
+  #             - '/invocations'
+  #     ResourceId:
+  #       Fn::GetAtt:
+  #         - ServerApi
+  #         - RootResourceId
+  #     RestApiId:
+  #       Ref: ServerApi
+Parameters:
+  BucketName:
+    Type: String
+    Default: 'game-server-cdk-demo'
+    Description: default value will be transformed to 'game-server-cdk-demo-<account-id>-<region>', use this to set your own bucket name
+  CreateBucket:
+    Type: String
+    Default: 'false'
+    Description: default is 'false', use 'true' if you want to create bucket. Please Note! bucket deletion policy is retain. Therefore as long as it is created and not manually deleted, you do not need to create it again.
+  CreateKeyPair:
+    Type: String
+    Default: 'false'
+    Description: default is 'false', use 'true' if you want to create key pair. Please Note! bucket deletion policy is retain. Therefore as long as it is created and not manually deleted, you do not need to create it again.
+  ServerName:
+    Type: String
+    Default: 'dedicated-game-server'
+    Description: default is 'dedicated-game-server', use this to set your own server name
+  ServerStackName:
+    Type: String
+    Default: 'game-server-stack-01'
+    Description: a name used to identify this server stack, use this to set your own server stack name. e.g. it can be a city name, a logical name. Bunch of instances can be assigned under the same stack name.
+  ExpirationBackup:
+    Type: Number
+    Default: 3
+    Description: Backup data will be expired in xx days. Default is 3 days.
+  SecurityGroupId:
+    Type: String
+    Description: ID of EC2 instance security group
+  SubnetId:
+    Type: String
+    Description: ID of EC2 instance security group
+  ServerSize:
+    Type: String
+    Default: t3.xlarge
+    Description: t3.large is recommended for up to 3 players. t3.xlarge is recommended for 4-8 players, t3.2xlarge is recommended for up to 20 players. Other options are for premium setup.
+    AllowedValues:
+      - t3.xlarge
+      - t3.large
+      - t3.2xlarge
+      - r6i.large
+      - r6i.xlarge
+      - r6i.2xlarge
+Conditions:
+  createBucket: !Equals [!Ref CreateBucket, 'true']
+  createKeyPair: !Equals [!Ref CreateKeyPair, 'true']
+
+Outputs:
+  GameServerIP:
+    Value: !Ref GameServerEIP
+    Description: Game Server Instance EIP
+  BucketName:
+    Value: !Join
+      - ''
+      - - !Ref BucketName
+        - '-'
+        - !Ref AWS::AccountId
+        - '-'
+        - !Ref AWS::Region
+    Description: Bucket Name
+    InstanceId:
+      Value: !Ref GameServerInstance
+      Description: Game Server Instance Id
+    ServerStackName:
+      Value: !Ref ServerStackName
+      Description: Server Stack Name
+    ServerName:
+      Value: !Ref ServerName
+      Description: Server Name
+    InstancePrivateIp:
+      Value: !GetAtt GameServerInstance.PrivateIpAddress
+      Description: Game Server Instance Private IP
+    AwsStackName:
+      Value: !Ref AWS::StackName
+      Description: AWS Stack Name
+
+  # ServerApiEndpoint:
+  #   Value:
+  #     Fn::Join:
+  #       - ''
+  #       - - https://
+  #         - Ref: ServerApi
+  #         - '.execute-api.'
+  #         - Ref: AWS::Region
+  #         - '.'
+  #         - Ref: AWS::URLSuffix
+  #         - '/'
+  #         - Ref: ServerApiDeploymentStageProd
+  #         - '/'
