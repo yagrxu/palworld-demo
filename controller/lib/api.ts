@@ -1,10 +1,10 @@
 import {Construct} from "constructs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
-import {ApiFunction} from "./api-functions";
+import {Function} from "aws-cdk-lib/aws-lambda";
 import {Topic} from "aws-cdk-lib/aws-sns";
 
 export class ControllerApi {
-    static createServerApis(scope: Construct, topic: Topic){
+    static createServerApis(scope: Construct, topic: Topic, func: Function){
         const api = new apigateway.RestApi(scope, 'controller-api', {
             restApiName: 'controller Service',
             description: 'This service serves platform orchestration.'
@@ -15,7 +15,7 @@ export class ControllerApi {
          * {size, stackName, serverName...}
          **/
         const serversApi = api.root.addResource('servers')
-        const createServerIntegration = new apigateway.LambdaIntegration(ApiFunction.createInstanceFunction(scope, topic), {
+        const createServerIntegration = new apigateway.LambdaIntegration(func, {
             requestTemplates: {'application/json': '{ "statusCode": "200" }'}
         });
         serversApi.addMethod('POST', createServerIntegration)

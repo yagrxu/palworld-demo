@@ -26,12 +26,12 @@ export class ControllerStack extends cdk.Stack {
     const cfCreationTopic = Notifications.createCfNotificationTopic(this, 'cf-creation-topic');
     const cfOpsTopic = Notifications.createOpsNotificationTopic(this, 'cf-callback-topic');
     ApiFunction.createCfCallbackHandler(this, cfOpsTopic);
-    ControllerApi.createServerApis(this, cfCreationTopic);
-    // serverTemplate.bucket.grantRead()
+    const serverHandler = ApiFunction.createInstanceFunction(this, cfCreationTopic, networksTemplate.httpUrl);
+    ControllerApi.createServerApis(this, cfCreationTopic, serverHandler);
+    serverTemplate.bucket.grantRead(serverHandler);
     // bucket.grantReadWrite(handler);
 
     // storage
     Storage.createDynamoDbTables(this);
-
   }
 }
