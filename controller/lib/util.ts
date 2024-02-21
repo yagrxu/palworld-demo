@@ -46,6 +46,10 @@ export class Util {
         let bucketName= process.env.BUCKET_NAME;
         return {createKeyPair, createBucket, bucketName}
     }
+
+    static randomSuffix(){
+        return (Math.random() + 1).toString(36).substring(5);
+    }
 }
 interface PrivateProps {
     readonly createKeyPair: string;

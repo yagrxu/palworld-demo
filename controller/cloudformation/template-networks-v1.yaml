@@ -336,3 +336,4 @@ Outputs:
   VpcId:
     Value: !Ref GameServerVPC
     Description: VPC ID
+

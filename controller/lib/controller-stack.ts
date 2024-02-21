@@ -6,6 +6,7 @@ import {Notifications} from "./notifications";
 import {ApiFunction} from "./api-functions";
 import {ControllerApi} from "./api";
 import {Storage} from "./storage";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 export class ControllerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -25,10 +26,62 @@ export class ControllerStack extends cdk.Stack {
 
     const cfCreationTopic = Notifications.createCfNotificationTopic(this, 'cf-creation-topic');
     const cfOpsTopic = Notifications.createOpsNotificationTopic(this, 'cf-callback-topic');
-    ApiFunction.createCfCallbackHandler(this, cfOpsTopic);
-    const serverHandler = ApiFunction.createInstanceFunction(this, cfCreationTopic, networksTemplate.httpUrl);
-    ControllerApi.createServerApis(this, cfCreationTopic, serverHandler);
-    serverTemplate.bucket.grantRead(serverHandler);
+    ApiFunction.createCfCallbackHandler(this, cfCreationTopic);
+    const networksHandler = ApiFunction.createCfDeployFunction(this,
+        'networks-deployer',
+        'cf-deployer.main',
+        [
+          new iam.PolicyStatement({
+            actions: ['cloudformation:CreateStack'],
+            resources: ['*']
+          }),
+          new iam.PolicyStatement({
+            actions: ['SNS:Publish'],
+            resources: [cfCreationTopic.topicArn]
+          }),
+          new iam.PolicyStatement({
+            actions: ['ec2:*'],
+            resources: ['*']
+          }),
+        ],
+        {
+          TOPIC_ARN: cfCreationTopic.topicArn,
+          TEMPLATE_URL: networksTemplate.httpUrl,
+        });
+    const serversHandler = ApiFunction.createCfDeployFunction(this,
+        'server-deployer',
+        'cf-deployer.main',
+        [
+          new iam.PolicyStatement({
+            actions: ['cloudformation:CreateStack'],
+            resources: ['*']
+          }),
+          new iam.PolicyStatement({
+            actions: ['SNS:Publish'],
+            resources: [cfCreationTopic.topicArn]
+          }),
+          new iam.PolicyStatement({
+            actions: ['ec2:*'],
+            resources: ['*']
+          }),
+          new iam.PolicyStatement({
+            actions: ['ssm:*'],
+            resources: ['*']
+          }),
+          new iam.PolicyStatement({
+            actions: ['iam:CreateInstanceProfile', 'iam:RemoveRoleFromInstanceProfile', 'iam:AddRoleToInstanceProfile', 'iam:PassRole', 'iam:DeleteInstanceProfile', 'iam:AttachRolePolicy', 'iam:CreateRole'],
+            resources: ['*']
+          }),
+        ],
+        {
+          TOPIC_ARN: cfCreationTopic.topicArn,
+          TEMPLATE_URL: serverTemplate.httpUrl,
+        });
+    const api = ControllerApi.createApiGateway(this);
+    ControllerApi.createServerApis(this, api, cfCreationTopic, serversHandler);
+    serverTemplate.bucket.grantRead(serversHandler);
+    ControllerApi.createNetworksApis(this, api, cfCreationTopic, networksHandler);
+    networksTemplate.bucket.grantRead(networksHandler);
     // bucket.grantReadWrite(handler);
 
     // storage

@@ -1,12 +1,11 @@
 import boto3
 import os
-import json
 client = boto3.client('cloudformation')
 
 def main(event, context):
     print(event)
 
-    create_stack(event['stack_name'], os.environ.get('TEMPLATE_URL'), None)
+    create_stack(event['stack_name'], os.environ.get('TEMPLATE_URL'), [])
     return {
         'statusCode': 200
     }
