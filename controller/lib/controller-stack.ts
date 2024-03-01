@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
+import {Construct} from 'constructs';
 import {Util} from "./util";
 import {Asset} from "aws-cdk-lib/aws-s3-assets";
 import {Notifications} from "./notifications";
@@ -14,6 +14,7 @@ export class ControllerStack extends cdk.Stack {
 
     // get account ID
     const accountId = cdk.Stack.of(this).account;
+    const stackSuffix = (process.env.STACK_SUFFIX || id).toLowerCase()
 
     // create S3 bucket
     const backupBucket = Util.resolveS3Bucket(this, this.region, accountId);
@@ -26,57 +27,69 @@ export class ControllerStack extends cdk.Stack {
 
     const cfCreationTopic = Notifications.createCfNotificationTopic(this, 'cf-creation-topic');
     const cfOpsTopic = Notifications.createOpsNotificationTopic(this, 'cf-callback-topic');
-    ApiFunction.createCfCallbackHandler(this, cfCreationTopic);
+    ApiFunction.createCfCallbackHandler(this, 'cf-callback-handle-' + stackSuffix, cfCreationTopic, Util.TableName.get('networks') || 'networks');
     const networksHandler = ApiFunction.createCfDeployFunction(this,
-        'networks-deployer',
-        'cf-deployer.main',
-        [
-          new iam.PolicyStatement({
-            actions: ['cloudformation:CreateStack'],
-            resources: ['*']
-          }),
-          new iam.PolicyStatement({
-            actions: ['SNS:Publish'],
-            resources: [cfCreationTopic.topicArn]
-          }),
-          new iam.PolicyStatement({
-            actions: ['ec2:*'],
-            resources: ['*']
-          }),
-        ],
-        {
-          TOPIC_ARN: cfCreationTopic.topicArn,
-          TEMPLATE_URL: networksTemplate.httpUrl,
-        });
+      'networks-deployer-' + stackSuffix,
+      'cf-deployer.main',
+      [
+        new iam.PolicyStatement({
+          actions: ['cloudformation:CreateStack'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['dynamodb:PutItem'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['SNS:Publish'],
+          resources: [cfCreationTopic.topicArn]
+        }),
+        new iam.PolicyStatement({
+          actions: ['ec2:*'],
+          resources: ['*']
+        }),
+      ],
+      {
+        TOPIC_ARN: cfCreationTopic.topicArn,
+        TEMPLATE_URL: networksTemplate.httpUrl,
+        CF_MGMT_TABLE: Util.TableName.get("cf-mgmt"),
+        TYPE: 'NETWORK'
+      });
     const serversHandler = ApiFunction.createCfDeployFunction(this,
-        'server-deployer',
-        'cf-deployer.main',
-        [
-          new iam.PolicyStatement({
-            actions: ['cloudformation:CreateStack'],
-            resources: ['*']
-          }),
-          new iam.PolicyStatement({
-            actions: ['SNS:Publish'],
-            resources: [cfCreationTopic.topicArn]
-          }),
-          new iam.PolicyStatement({
-            actions: ['ec2:*'],
-            resources: ['*']
-          }),
-          new iam.PolicyStatement({
-            actions: ['ssm:*'],
-            resources: ['*']
-          }),
-          new iam.PolicyStatement({
-            actions: ['iam:CreateInstanceProfile', 'iam:RemoveRoleFromInstanceProfile', 'iam:AddRoleToInstanceProfile', 'iam:PassRole', 'iam:DeleteInstanceProfile', 'iam:AttachRolePolicy', 'iam:CreateRole'],
-            resources: ['*']
-          }),
-        ],
-        {
-          TOPIC_ARN: cfCreationTopic.topicArn,
-          TEMPLATE_URL: serverTemplate.httpUrl,
-        });
+      'server-deployer-' + stackSuffix,
+      'cf-deployer.main',
+      [
+        new iam.PolicyStatement({
+          actions: ['cloudformation:CreateStack'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['dynamodb:PutItem'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['SNS:Publish'],
+          resources: [cfCreationTopic.topicArn]
+        }),
+        new iam.PolicyStatement({
+          actions: ['ec2:*'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['ssm:*'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['iam:CreateInstanceProfile', 'iam:RemoveRoleFromInstanceProfile', 'iam:AddRoleToInstanceProfile', 'iam:PassRole', 'iam:DeleteInstanceProfile', 'iam:AttachRolePolicy', 'iam:CreateRole'],
+          resources: ['*']
+        }),
+      ],
+      {
+        TOPIC_ARN: cfCreationTopic.topicArn,
+        TEMPLATE_URL: serverTemplate.httpUrl,
+        CF_MGMT_TABLE: Util.TableName.get("cf-mgmt"),
+        TYPE: 'SERVER'
+      });
     const api = ControllerApi.createApiGateway(this);
     ControllerApi.createServerApis(this, api, cfCreationTopic, serversHandler);
     serverTemplate.bucket.grantRead(serversHandler);

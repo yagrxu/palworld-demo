@@ -13,7 +13,6 @@ export class ControllerApi {
     }
     static createServerApis(scope: Construct, api:RestApi, topic: Topic, func: Function){
 
-
         /** POST /servers
          * create a new server stack - info should be registered after creation
          * {size, stackName, serverName...}
@@ -25,7 +24,6 @@ export class ControllerApi {
         serversApi.addMethod('POST', createServerIntegration)
     }
     static createNetworksApis(scope: Construct, api:RestApi, topic: Topic, func: Function){
-
 
         /** POST /servers
          * create a new server stack - info should be registered after creation

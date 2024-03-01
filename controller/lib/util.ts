@@ -4,7 +4,14 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cdk from "aws-cdk-lib";
 
 export class Util {
-
+    static TableName = new Map<string, string>([
+        ["server", "server-table"],
+        ["nickname", "server-nick-name-mapping"],
+        ["session", "server-session"],
+        ["user", "user-data"],
+        ["networks", "networks"],
+        ["cf-mgmt", "cf-mgmt"],
+    ]);
     static resolveKeyPair(scope: Construct, region: string){
         let props = Util.resolvePrivateProps();
         const toCreate: string = props.createKeyPair;

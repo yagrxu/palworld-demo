@@ -7,7 +7,7 @@ import {Util} from "./util";
 
 export class ApiFunction {
     static createCfDeployFunction(scope: Construct, name: string, handler: string, policies: iam.PolicyStatement[], env: any){
-        let id = name + '-' + Util.randomSuffix()
+        let id = name
         return new lambda.Function(scope, id, {
             functionName: id,
             runtime: lambda.Runtime.PYTHON_3_12,
@@ -17,22 +17,24 @@ export class ApiFunction {
             initialPolicy: policies
         });
     }
-    static createCfCallbackHandler(scope: Construct, topic: Topic){
-        let callbackHandler = new lambda.Function(scope, 'cf-callback-handle-function', {
+    static createCfCallbackHandler(scope: Construct, id: string, topic: Topic, networkTableName: string){
+        let callbackHandler = new lambda.Function(scope, id, {
+            functionName: id,
             runtime: lambda.Runtime.PYTHON_3_12,
             code: lambda.Code.fromAsset('resources'),
             handler: 'cf-callback-handler.main',
             environment: {
                 TOPIC_ARN: topic.topicArn,
+                NETWORK_TABLE_NAME: networkTableName,
+                CF_MGMT_TABLE: Util.TableName.get("cf-mgmt") || 'cf-mgmt'
             },
             initialPolicy:[
                 new iam.PolicyStatement({
-                    actions: ['cloudformation:DescribeStacks'],
+                    actions: ['cloudformation:DescribeStacks', 'ec2:DescribeVpcs', 'ec2:DescribeSubnets', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:GetItem', 'dynamodb:Scan'],
                     resources: ['*']
                 })
             ]
         });
         topic.addSubscription(new subs.LambdaSubscription(callbackHandler))
     }
-
 }
