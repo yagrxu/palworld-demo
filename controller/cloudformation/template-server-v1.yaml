@@ -67,7 +67,7 @@ Resources:
   GameServerInstance:
     Type: AWS::EC2::Instance
     Properties:
-      AvailabilityZone: !Select [0, !GetAZs '']
+#      AvailabilityZone: !Select [0, !GetAZs '']
       IamInstanceProfile:
         Ref: InstanceProfile
       ImageId: !Ref UbuntuAmi
@@ -664,21 +664,21 @@ Outputs:
         - '-'
         - !Ref AWS::Region
     Description: Bucket Name
-    InstanceId:
-      Value: !Ref GameServerInstance
-      Description: Game Server Instance Id
-    ServerStackName:
-      Value: !Ref ServerStackName
-      Description: Server Stack Name
-    ServerName:
-      Value: !Ref ServerName
-      Description: Server Name
-    InstancePrivateIp:
-      Value: !GetAtt GameServerInstance.PrivateIpAddress
-      Description: Game Server Instance Private IP
-    AwsStackName:
-      Value: !Ref AWS::StackName
-      Description: AWS Stack Name
+  InstanceId:
+    Value: !Ref GameServerInstance
+    Description: Game Server Instance Id
+  ServerStackName:
+    Value: !Ref ServerStackName
+    Description: Server Stack Name
+  ServerName:
+    Value: !Ref ServerName
+    Description: Server Name
+  InstancePrivateIp:
+    Value: !GetAtt GameServerInstance.PrivateIp
+    Description: Game Server Instance Private IP
+  AwsStackName:
+    Value: !Ref AWS::StackName
+    Description: AWS Stack Name
 
   # ServerApiEndpoint:
   #   Value:

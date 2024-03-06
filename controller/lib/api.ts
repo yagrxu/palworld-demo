@@ -33,6 +33,18 @@ export class ControllerApi {
         const createServerIntegration = new apigateway.LambdaIntegration(func, {
             requestTemplates: {'application/json': '{ "statusCode": "200" }'}
         });
-        serversApi.addMethod('POST', createServerIntegration)
+        serversApi.addMethod('POST', createServerIntegration);
+    }
+
+    static findNextSubnetApi(scope: Construct, api:RestApi, func: Function){
+        let networkApi = api.root.getResource('networks');
+        if (!networkApi){
+            networkApi = api.root.addResource('networks');
+        }
+        const randomNetworkApi = networkApi.addResource('random');
+        const createServerIntegration = new apigateway.LambdaIntegration(func, {
+            requestTemplates: {'application/json': '{ "statusCode": "200" }'}
+        });
+        randomNetworkApi.addMethod('GET', createServerIntegration)
     }
 }

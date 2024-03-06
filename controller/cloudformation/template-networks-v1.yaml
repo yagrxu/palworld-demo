@@ -336,4 +336,6 @@ Outputs:
   VpcId:
     Value: !Ref GameServerVPC
     Description: VPC ID
-
+  SecurityGroupId:
+    Value: !Ref SecurityGroup
+    Description: Security Group ID

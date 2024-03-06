@@ -25,7 +25,7 @@ def handle_status(resource_id, stack_name, status):
             stack_info = get_cf_status(stack_name.replace("'", ''))
             output_map = get_output(stack_name.replace("'", ''))
             if stack_info['type'] == 'NETWORK':
-                handle_networks_cf_complete(stack_info, output_map['VpcId'])
+                handle_networks_cf_complete(stack_info, output_map)
             else:
                 handle_server_cf_complete(stack_info)
         elif status == "'DELETE_COMPLETE'":
@@ -39,9 +39,11 @@ def handle_server_cf_complete():
     print('handle server cf complete')
     return
 
-def handle_networks_cf_complete(stack_info, vpc_id):
+def handle_networks_cf_complete(stack_info, output_map):
+    vpc_id = output_map['VpcId']
+    sg_id = output_map['SecurityGroupId']
     update_cf_status(stack_info)
-    update_networks_data(stack_info['stackName'],vpc_id)
+    update_networks_data(stack_info['stackName'],vpc_id, sg_id)
 
     print('handle networks cf complete')
     return
@@ -77,8 +79,9 @@ def delete_networks_data(stack_name):
     })
     return
 
-def update_networks_data(stack_name, vpc_id):
+def update_networks_data(stack_name, vpc_id, sg_id):
     vpc_info = get_vpc_info(vpc_id)
+    vpc_info['SecurityGroupId'] = sg_id
     ddb_client.put_item(TableName=os.environ.get('NETWORK_TABLE_NAME'), Item={
         'stackName': {
             'S': stack_name

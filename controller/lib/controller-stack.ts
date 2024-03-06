@@ -28,6 +28,7 @@ export class ControllerStack extends cdk.Stack {
     const cfCreationTopic = Notifications.createCfNotificationTopic(this, 'cf-creation-topic');
     const cfOpsTopic = Notifications.createOpsNotificationTopic(this, 'cf-callback-topic');
     ApiFunction.createCfCallbackHandler(this, 'cf-callback-handle-' + stackSuffix, cfCreationTopic, Util.TableName.get('networks') || 'networks');
+    const findNetworkHandler = ApiFunction.createFindNextNetworkHandler(this, 'find-next-network-' + stackSuffix, Util.TableName.get('networks') || 'networks');
     const networksHandler = ApiFunction.createCfDeployFunction(this,
       'networks-deployer-' + stackSuffix,
       'cf-deployer.main',
@@ -80,9 +81,28 @@ export class ControllerStack extends cdk.Stack {
           resources: ['*']
         }),
         new iam.PolicyStatement({
-          actions: ['iam:CreateInstanceProfile', 'iam:RemoveRoleFromInstanceProfile', 'iam:AddRoleToInstanceProfile', 'iam:PassRole', 'iam:DeleteInstanceProfile', 'iam:AttachRolePolicy', 'iam:CreateRole'],
+          actions: [
+            'iam:CreateInstanceProfile',
+            'iam:PutRolePolicy',
+            'iam:RemoveRoleFromInstanceProfile',
+            'iam:AddRoleToInstanceProfile',
+            'iam:TagRole',
+            'iam:PassRole',
+            'iam:DeleteInstanceProfile',
+            'iam:AttachRolePolicy',
+            'iam:CreateRole',
+            'iam:GetRole'
+          ],
           resources: ['*']
         }),
+        new iam.PolicyStatement({
+          actions: ['lambda:*'],
+          resources: ['*']
+        }),
+        new iam.PolicyStatement({
+          actions: ['events:*'],
+          resources: ['*']
+        })
       ],
       {
         TOPIC_ARN: cfCreationTopic.topicArn,
@@ -95,7 +115,7 @@ export class ControllerStack extends cdk.Stack {
     serverTemplate.bucket.grantRead(serversHandler);
     ControllerApi.createNetworksApis(this, api, cfCreationTopic, networksHandler);
     networksTemplate.bucket.grantRead(networksHandler);
-    // bucket.grantReadWrite(handler);
+    ControllerApi.findNextSubnetApi(this, api, findNetworkHandler);
 
     // storage
     Storage.createDynamoDbTables(this);

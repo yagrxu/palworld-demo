@@ -37,4 +37,23 @@ export class ApiFunction {
         });
         topic.addSubscription(new subs.LambdaSubscription(callbackHandler))
     }
+
+    static createFindNextNetworkHandler(scope: Construct, id: string, networkTableName: string){
+        return new lambda.Function(scope, id, {
+            functionName: id,
+            runtime: lambda.Runtime.PYTHON_3_12,
+            code: lambda.Code.fromAsset('resources'),
+            handler: 'find-possible-networks.main',
+            environment: {
+                NETWORK_TABLE_NAME: networkTableName,
+                CF_MGMT_TABLE: Util.TableName.get("cf-mgmt") || 'cf-mgmt'
+            },
+            initialPolicy:[
+                new iam.PolicyStatement({
+                    actions: ['cloudformation:DescribeStacks', 'ec2:DescribeVpcs', 'ec2:DescribeSubnets', 'dynamodb:Scan'],
+                    resources: ['*']
+                })
+            ]
+        });
+    }
 }
