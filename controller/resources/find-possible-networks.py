@@ -10,7 +10,7 @@ ec2_client = boto3.client('ec2')
 def main(event, context):
     vpcs = get_vpcs()
     for vpc in vpcs:
-        vpcInfoStr = vpc['vpcInfo']['S']
+        vpcInfoStr = vpc['VpcInfo']['S']
         vpcInfo = ast.literal_eval(vpcInfoStr)
         vpcId = vpcInfo['VpcId']
         sgId = vpcInfo['SecurityGroupId']

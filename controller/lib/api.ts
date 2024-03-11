@@ -22,6 +22,7 @@ export class ControllerApi {
             requestTemplates: {'application/json': '{ "statusCode": "200" }'}
         });
         serversApi.addMethod('POST', createServerIntegration)
+
     }
     static createNetworksApis(scope: Construct, api:RestApi, topic: Topic, func: Function){
 

@@ -9,10 +9,10 @@ def main(event, context):
     # print(event)
     content = json.loads(event['body'])
     stack_name = content['stack_name']
+    parameters = content['parameters']
     if 'parameters' not in content.keys() or len(content['parameters']) == 0:
         create_stack(stack_name, os.environ.get('TEMPLATE_URL'))
     else:
-        parameters = content['parameters']
         create_stack_with_params(stack_name, os.environ.get('TEMPLATE_URL'), parameters)
     return {
         'body': 'Stack ' + stack_name + ' is being created',
@@ -36,15 +36,15 @@ def create_stack(stack_name, template_url):
         EnableTerminationProtection=False,
     )
     stack_info = {}
-    stack_info['stack_name'] = stack_name
-    stack_info['stack_id'] = response['StackId']
+    stack_info['stackName'] = stack_name
+    stack_info['stackId'] = response['StackId']
     stack_info['type'] = os.environ.get('TYPE')
-    stack_info['stack_status'] = 'CREATING'
+    stack_info['stackStatus'] = 'CREATING'
     ddb_client.put_item(TableName=os.environ.get('CF_MGMT_TABLE'), Item={
-        'StackName': {
+        'stackName': {
             'S': stack_name
         },
-        'Info': {
+        'info': {
             'S': str(stack_info)
         }
     })
@@ -64,15 +64,15 @@ def create_stack_with_params(stack_name, template_url, parameters):
         EnableTerminationProtection=False,
     )
     stack_info = {}
-    stack_info['stack_name'] = stack_name
-    stack_info['stack_id'] = response['StackId']
+    stack_info['stackName'] = stack_name
+    stack_info['stackId'] = response['StackId']
     stack_info['type'] = os.environ.get('TYPE')
-    stack_info['stack_status'] = 'CREATING'
+    stack_info['stackStatus'] = 'CREATING'
     ddb_client.put_item(TableName=os.environ.get('CF_MGMT_TABLE'), Item={
-        'StackName': {
+        'stackName': {
             'S': stack_name
         },
-        'Info': {
+        'info': {
             'S': str(stack_info)
         }
     })

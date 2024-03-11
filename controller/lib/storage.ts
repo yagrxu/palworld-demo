@@ -42,15 +42,15 @@ export class Storage {
         const networks = new dynamodb.Table(scope, 'networks', {
             tableName: Util.TableName.get("networks"),
             pointInTimeRecovery: true,
-            partitionKey: {name: 'stackName', type: AttributeType.STRING},
-            sortKey: {name: 'vpcId', type: AttributeType.STRING},
+            partitionKey: {name: 'StackName', type: AttributeType.STRING},
+            sortKey: {name: 'VpcId', type: AttributeType.STRING},
             deletionProtection: false,
             removalPolicy: RemovalPolicy.DESTROY,
         });
         const cfManagement = new dynamodb.Table(scope, 'cfManagement', {
             tableName: Util.TableName.get("cf-mgmt"),
             pointInTimeRecovery: true,
-            partitionKey: {name: 'stackName', type: AttributeType.STRING},
+            partitionKey: {name: 'StackName', type: AttributeType.STRING},
             deletionProtection: false,
             removalPolicy: RemovalPolicy.DESTROY,
         });

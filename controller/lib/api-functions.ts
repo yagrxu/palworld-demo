@@ -26,13 +26,20 @@ export class ApiFunction {
             environment: {
                 TOPIC_ARN: topic.topicArn,
                 NETWORK_TABLE_NAME: networkTableName,
-                CF_MGMT_TABLE: Util.TableName.get("cf-mgmt") || 'cf-mgmt'
+                CF_MGMT_TABLE: Util.TableName.get("cf-mgmt") || 'cf-mgmt',
+                SERVER_TABLE_NAME: Util.TableName.get('server') || 'server-table',
+                NICKNAME_TABLE_NAME: Util.TableName.get('nickname') || 'server-nick-name-mapping'
+
             },
             initialPolicy:[
                 new iam.PolicyStatement({
-                    actions: ['cloudformation:DescribeStacks', 'ec2:DescribeVpcs', 'ec2:DescribeSubnets', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:GetItem', 'dynamodb:Scan'],
+                    actions: ['cloudformation:DescribeStacks', 'ec2:DescribeVpcs', 'ec2:DescribeInstances', 'ec2:DescribeSubnets', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:GetItem', 'dynamodb:Scan'],
                     resources: ['*']
-                })
+                }),
+                new iam.PolicyStatement({
+                    actions: ['cloudformation:Delete*', 'ec2:Delete*', 'dynamodb:Delete*', 'lambda:Delete*', 'event:Delete*', 'ssm:Delete*', 'iam:DetachRolePolicy', 'iam:Delete*'],
+                    resources: ['*']
+                }),
             ]
         });
         topic.addSubscription(new subs.LambdaSubscription(callbackHandler))
